@@ -77,12 +77,12 @@ rd_disk_16:
     mov di,cx
     mov ax,cx
 
-    
+    ; 0x1f2 给传入需要读取的扇区数量
     mov dx,0x1f2
     out dx,al
     mov cl,8
     mov eax,esi
-
+    ; 3 ~ 5 是LBA地址的部分
     mov dx,0x1f3
     out dx,al
 
@@ -93,9 +93,10 @@ rd_disk_16:
     shr eax,cl
     mov dx,0x1f5
     out dx,al
-
     shr eax,cl
+    ; 这里是为了保存LBA地址
     and al,0x0f
+    ; 设置属性
     or al,0xe0
     mov dx,0x1f6
     out dx,al
