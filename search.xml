@@ -19,17 +19,17 @@
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&lt;bochs:1&gt; b 0x7c00</span><br><span class="line">&lt;bochs:2&gt; c</span><br><span class="line">(0) Breakpoint 1, 0x00007c00 in ?? ()</span><br><span class="line">Next at t=17178866</span><br><span class="line">(0) [0x000000007c00] 0000:7c00 (unk. ctxt): jmp .+4  (0x00007c06)     ; eb04</span><br><span class="line">&lt;bochs:3&gt; n</span><br><span class="line">Next at t=17178867</span><br><span class="line">(0) [0x000000007c06] 0000:7c06 (unk. ctxt): mov ax, 0x0000            ; b80000</span><br><span class="line">&lt;bochs:4&gt; </span><br><span class="line">Next at t=17178868</span><br><span class="line">(0) [0x000000007c09] 0000:7c09 (unk. ctxt): mov ds, ax                ; 8ed8</span><br><span class="line">&lt;bochs:5&gt; </span><br><span class="line">Next at t=17178869</span><br><span class="line">(0) [0x000000007c0b] 0000:7c0b (unk. ctxt): mov ss, ax                ; 8ed0</span><br><span class="line">&lt;bochs:6&gt; </span><br><span class="line">Next at t=17178870</span><br><span class="line">(0) [0x000000007c0d] 0000:7c0d (unk. ctxt): mov esp, 0x00007c00       ; 66bc007c0000</span><br><span class="line">&lt;bochs:7&gt; </span><br><span class="line">Next at t=17178871</span><br><span class="line">(0) [0x000000007c13] 0000:7c13 (unk. ctxt): push ax                   ; 50</span><br><span class="line">&lt;bochs:8&gt; </span><br><span class="line">Next at t=17178872</span><br><span class="line">(0) [0x000000007c14] 0000:7c14 (unk. ctxt): jmp .-2  (0x00007c14)     ; ebfe</span><br></pre></td></tr></table></figure>
 <p>此时就完全正确了,在早期实模式下,更可怕的是没有限制的自由,你想访问哪儿都可以,想改变指定内存的数据都是可以的,程序A的数值被程序B就可以随意更改,甚至更改程序A的代码运行逻辑,这是很可怕的,所以就有了保护模式.</p>
 <h4 id="保护模式"><a href="#保护模式" class="headerlink" title="保护模式"></a>保护模式</h4><p>当时急需对电脑中的程序有特权等级的划分,以及代码段,数据段等等的限制,段属性,段基址,段界限,为了提高电脑运行时候的安全性:如果CPU不小心运行到数据段就报错,用户程序试图修改不属于自己的段信息就会报错,这样安全程度就会大大提高,上述需求的实现均基于一种数据结构:段描述符.段描述符通常由一组16字节的数据表示，包含了内存段的各种属性和控制信息.下面是x86-32位下的段描述符的结构:</p>
-<p><img src="/./image/%E6%AE%B5%E6%8F%8F%E8%BF%B0%E7%AC%A6.png" alt="照片"></p>
+<p><img src="/../image/%E6%AE%B5%E6%8F%8F%E8%BF%B0%E7%AC%A6.png" alt="照片"></p>
 <p>我们来看看具体的描述符初始化的环境:</p>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; 文件名 : test.S </span><br><span class="line">; 编译指令 : nasm test.S -f bin -o test.bin</span><br><span class="line"> DA_DRW		equ	92h	; 存在的可读写数据段属性值</span><br><span class="line"> DA_DPL3		equ	  60h	; DPL = 3</span><br><span class="line"> ; 描述符的宏实现</span><br><span class="line"> ; usage: Descriptor Base, Limit, Attr</span><br><span class="line"> ;        Base:  dd</span><br><span class="line"> ;        Limit: dd (low 20 bits available)</span><br><span class="line"> ;        Attr:  dw (lower 4 bits of higher byte are always 0)</span><br><span class="line"> %macro Descriptor 3</span><br><span class="line"> 	dw	%2 &amp; 0FFFFh				; 段界限 1				(2 字节)</span><br><span class="line"> 	dw	%1 &amp; 0FFFFh				; 段基址 1				(2 字节)</span><br><span class="line"> 	db	(%1 &gt;&gt; 16) &amp; 0FFh			; 段基址 2				(1 字节)</span><br><span class="line"> 	dw	((%2 &gt;&gt; 8) &amp; 0F00h) | (%3 &amp; 0F0FFh)	; 属性 1 + 段界限 2 + 属性 2		(2 字节)</span><br><span class="line"> 	db	(%1 &gt;&gt; 24) &amp; 0FFh			; 段基址 3				(1 字节)</span><br><span class="line"> %endmacro ; 共 8 字节</span><br><span class="line"> ; 下面来看一个具体的使用</span><br><span class="line"> LABEL_DESC_DATA:		Descriptor	           0,             0FFFFh, DA_DRW + DA_DPL3					; Data</span><br></pre></td></tr></table></figure>
-<p>动手强的可以来编译看一看,我这里也不卖关子,直接给结果:<br><img src="/./image/bin_%E6%AE%B5%E6%8F%8F%E8%BF%B0%E7%AC%A6.png" alt="照片"></p>
+<p>动手强的可以来编译看一看,我这里也不卖关子,直接给结果:<br><img src="/../image/bin_%E6%AE%B5%E6%8F%8F%E8%BF%B0%E7%AC%A6.png" alt="照片"></p>
 <p>x86是小端序,这里的机器码转换成上面表格的格式来看,可以看到特权级的确为3.</p>
 <figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">00 00 f2 00 // 高32位</span><br><span class="line">00 00 ff ff // 低32位</span><br></pre></td></tr></table></figure>
 
 <h1 id="RPL"><a href="#RPL" class="headerlink" title="RPL"></a>RPL</h1><p>RPL全称是<code>Request Privilege Level</code>,请求特权级.还记得刚刚说的段描述符吗?段描述符是在内存中的,而且你也看到了这里面段基址,段界限,以及各种属性看起来比较不符合常理,这实际上是为了兼容以前的老古董处理器,Intel公司能有现在的规模,对以前处理器的兼容功不可没,但是兼容归兼容,这鬼东西总不能我用一下就去内存里面整合计算一下吧,即使有很好的代码逻辑进行封装,调用起来很方便,这也是一件很离谱的事情,为什么呢?<strong>效率</strong>.</p>
 <p>内存很快吧?相对于网络和磁盘罢了,跟CPU的速度相比就慢太多了,而跟CPU内部的<code>L1 L2 L3</code>缓存以及寄存器相比就慢太多了,为了保护模式我们能更高效的使用段描述符,我们也急需一个缓存机制来让段描述符和寄存器的效率相当(比如代码描述符,运行一次就要用一次来进行判断有没有越界(跑到数据区)等),能和寄存器效率相当的当然是寄存器.我们在实模式下使用:<code>段地址:偏移地址</code> 进行寻址,保护模式下使用的是<code>段选择子:偏移地址</code>.寄存器是很值钱的,巴不得一个掰两个用,就将实模式下存储段地址的段寄存器用来存储段选择子.</p>
 <h2 id="2-1-段选择子"><a href="#2-1-段选择子" class="headerlink" title="2.1 段选择子"></a>2.1 段选择子</h2><p>段寄存器有缓存机制,且不给程序员开放.段寄存器的缓存是一种用于提高内存访问效率的技术，它允许 CPU 在一段时间内缓存最近访问的段描述符.这些寄存器存储了当前正在执行的指令所在的代码段、数据段等信息.我们可以通过改变段寄存器的选择子来缓存新的段描述符.(希望我说清楚了)</p>
-<p>段选择子的结构:<br><img src="/./image/%E6%AE%B5%E9%80%89%E6%8B%A9%E5%AD%90.png" alt="照片"></p>
+<p>段选择子的结构:<br><img src="/../image/%E6%AE%B5%E9%80%89%E6%8B%A9%E5%AD%90.png" alt="照片"></p>
 <p>我们可以看到其由三部分构成:描述符索引值(与段描述符是一一映射),TI(GDT表还是LDT表),RPL(终于到正题了).</p>
 <p><strong>请求</strong>,能够<strong>请求</strong>计算机资源的是什么?指令呀!你总不能指望你定义的一个int型数据请求计算机资源吧.<strong>只有指令才有访问,请求其他资源的能力</strong>.所以cs段寄存器段选择子的<code>RPL</code>位表示代码请求别人资源的特权等级,由于cs:eip指向的指令是CPU正在执行的,也称处理器的当前特权级是CS.RPL.至于为什么会有RPL,后面的调用门会zhen</p>
 <h1 id="CPL"><a href="#CPL" class="headerlink" title="CPL"></a>CPL</h1><p>RPL全称是<code>Current Privilege Level</code>,当前特权级.这里你肯定纳闷了,非要单独整个<code>CPL</code>,这不就是cs段寄存器段选择子的<code>RPL</code>,这话是对的,但不完全对.</p>
@@ -50,11 +50,11 @@
 <p>中断门&#x2F;陷阱门：用于中断处理过程使用；可放在IDT</p>
 <p>任务门：对应单个任务，用来执行任务切换.可放在GDT,LDT,IDT</p>
 <p>任务门、调用门都可以用 call 和 jmp 指令直接调用,原因是这两个门描述符都位于描述符表中,要么是 GDT,要么是 LDT,访问它们同普通的段描述符是一样的,也必须要通过选择子,因此只要在 call 或jmp 指令后接任务门或调用门的选择子便可调用它们了.陷阱门和中断门只存在于 IDT 中,因此不能主动调用,只能由中断信号来触发调用.</p>
-<p>RPL的产生就是为了解决系统调用越权问题,系统调用的实现中,调用门(现在更多的是中断门)和中断门最为合适.当程序使用门进行特权级别的转换或跳转时，处理器会比较段选择子中的RPL字段和目标门描述符中的DPL字段.只有当RPL字段不低于DPL字段时，才允许特权级别的转换或跳转.换句话说，RPL提供了一种请求特权级别的机制，而门描述符的DPL则控制了对应门的访问权限.<br><img src="/./image/%E9%97%A8%E7%9A%84%E4%BD%9C%E7%94%A8.png" alt="图片"></p>
+<p>RPL的产生就是为了解决系统调用越权问题,系统调用的实现中,调用门(现在更多的是中断门)和中断门最为合适.当程序使用门进行特权级别的转换或跳转时，处理器会比较段选择子中的RPL字段和目标门描述符中的DPL字段.只有当RPL字段不低于DPL字段时，才允许特权级别的转换或跳转.换句话说，RPL提供了一种请求特权级别的机制，而门描述符的DPL则控制了对应门的访问权限.<br><img src="/../image/%E9%97%A8%E7%9A%84%E4%BD%9C%E7%94%A8.png" alt="图片"></p>
 <h2 id="调用门"><a href="#调用门" class="headerlink" title="调用门"></a>调用门</h2><p>调用门是一个描述符,称为门描述符,存储在GDT或者LDT中,虽然该数据结构是在分段机制时候使用,现在的操作系统大多不是用调用门,更多使用的是中断门来实现函数调用,但我们还是来学习一下先人的智慧.通常调用门是通过call或者jmp后面接调用门的段选择子(GDT,LDT表,肯定有段选择子)来使用的.调用门只能向<strong>平级</strong>或者<strong>更高级</strong>转移,<strong>只有<code>retf</code>和<code>iret</code>才能由高特权级到低特权级.</strong>,这句话一会就会用到,我们先来看一下调用门的结构:</p>
-<p><img src="/./image/%E8%B0%83%E7%94%A8%E9%97%A8%E7%BB%93%E6%9E%84.png" alt="图片"></p>
+<p><img src="/../image/%E8%B0%83%E7%94%A8%E9%97%A8%E7%BB%93%E6%9E%84.png" alt="图片"></p>
 <p>可以看到其存储了被调用例程的选择子,以及其偏移量.那么具体执行流程如下图所示:</p>
-<p><img src="/./image/%E8%B0%83%E7%94%A8%E9%97%A8%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B.png" alt="图片"></p>
+<p><img src="/../image/%E8%B0%83%E7%94%A8%E9%97%A8%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B.png" alt="图片"></p>
 <p>解释的很清楚我就不赘述,现在有两个问题:</p>
 <ol>
 <li>如果我<code>call</code>或者<code>jmp</code>指定调用门描述符选择子时,后面接偏移地址会发生什么?比如<code>call gate:0x123</code>.</li>
@@ -81,7 +81,7 @@
 </ol>
 <p>这里需要注意的是:由于在特权级为0时候,可能将ds,es,fs等段寄存器其中某些设置为特权级来使用了,但是<code>retf</code>后并没有更改回去,且处理器就会将其(段寄存器的DPL &gt; CPL)修改为0.这里就解释了为什么GDT表要专门留一个NULL,从而出发处理器异常,本质上就是为了安全,防止出现漏洞.听着很不可思议吧.怎么会有这样的设计.所以linux使用中断门自己实现了一套更高效的上下文切换.</p>
 <h3 id="调用门的弊端-RPL的必要性"><a href="#调用门的弊端-RPL的必要性" class="headerlink" title="调用门的弊端(RPL的必要性)"></a>调用门的弊端(RPL的必要性)</h3><p>正常情况下仅仅靠DPL和CPL好像也不是不行?的确是这样的.但是吧应用程序也存在恶意程序,比如使用调用门实现memcpy的功能,参数是:数据源所在段的段选择子以及偏移地址,目的所在段的段选择子以及偏移地址,拷贝的字节数量.</p>
-<p><img src="/./image/%E8%B0%83%E7%94%A8%E9%97%A8%E5%BC%8A%E7%AB%AF.png" alt="照片"></p>
+<p><img src="/../image/%E8%B0%83%E7%94%A8%E9%97%A8%E5%BC%8A%E7%AB%AF.png" alt="照片"></p>
 <p>我们先来看左侧调用，正常使用一切安好，但是，如果传入的内核数据源所在段的选择子以及内核的偏移地址呢？这并不是不可能的，GDT表中元素没有很多，暴力一个个尝试也不是不可以。这不就将内核的数据拷贝进了用户的缓冲区，相当于用户可以访问内核才能访问的数据。</p>
 <p>再看右侧的调用，右侧本身是不可行的，也是通过暴力尝试GDT表中的元素找到内核的数据段，这样用户就可以修改内核才能修改的数据。好了，用户既能查看还能修改，保护形同虚设。但是又不能一棒子打死，用户态做不了的事情必须让内核出手，此时RPL就很好的解决了这个问题，问题根儿不能在于CPU不知道访问者的真实身份，它不知道这是用户通过门调用进入内核的，所以这里的RPL就起到这个作用，让CPU知道真正访问这些资源的是谁，内核还是用户。</p>
 <p>现代OS基本上都弃用了调用门，使用中断门来实现系统调用。</p>
