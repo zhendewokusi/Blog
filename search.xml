@@ -1,0 +1,1030 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title>DPL CPL RPL 门</title>
+    <url>/2024/02/04/DPL-CPL-RPL/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><ul>
+<li>实验环境:Archlinux + Bochs x86 Emulator 2.7</li>
+<li>编译器: nasm</li>
+</ul>
+<p><strong>—以下均是我的个人笔记,如有错误,敬请指正.—</strong></p>
+<span id="more"></span>
+<h1 id="DPL"><a href="#DPL" class="headerlink" title="DPL"></a>DPL</h1><p>DPL全称是<code>Descriptor Privilege Level</code>,描述符特权级.这里是在保护模式设置段描述符的时候进行确认的,比如内核d代码段的特权级别是0,用户程序代码段的特别级别是3,这是在设置描述符的时候就确定的.我还是在此解释一下什么是描述符.</p>
+<h2 id="1-什么是描述符"><a href="#1-什么是描述符" class="headerlink" title="1. 什么是描述符"></a>1. 什么是描述符</h2><p>要解释描述符就要解释什么是实模式什么是保护模式,真是一路修到发电厂…</p>
+<h3 id="1-1-实模式与保护模式"><a href="#1-1-实模式与保护模式" class="headerlink" title="1.1 实模式与保护模式"></a>1.1 实模式与保护模式</h3><h4 id="实模式为什么危险"><a href="#实模式为什么危险" class="headerlink" title="实模式为什么危险"></a>实模式为什么危险</h4><p>计算机的世界只有0和1,而这些0和1被人为划定为指令和数据,CPU是比较傻的,它并不知道指令和数据的区别,它就像一个完全服从的士兵一样,你想让它干什么它就干什么.即使你在实模式下一不小心让CPU执行本该属于数据的地方,它也会自己说服自己,将数据强行理解成指令.也许你听起来比较懵,事实的确如此,我们简单来写一个汇编demo,不要害怕,即使你没有学习过汇编语言,相信在我的注释下你也能看懂,放码:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; 文件名: mbr.S</span><br><span class="line">MBR_BASE_ADDR equ 0x7c00	; 类似于C语言的define宏定义,编译期间进行替换</span><br><span class="line">org	MBR_BASE_ADDR			; org 指令告诉汇编器将代码放置在指定的内存地址处</span><br><span class="line">    ; jmp code				; jmp 翻译:跳,跳到code那里运行</span><br><span class="line">data:</span><br><span class="line">    _var1 dw 0x55			; 定义了一个名为 _var1 的 16 位（即 2 字节）数据，初始值为 0x55</span><br><span class="line">    _var2 dw 0x00			; 同理</span><br><span class="line">code:</span><br><span class="line">    mov ax,0				; 下面都是具体命令,我们此时不关心具体是什么指令</span><br><span class="line">    mov ds,ax</span><br><span class="line">    mov ss,ax</span><br><span class="line">    mov esp,0x7c00</span><br><span class="line">    push ax</span><br><span class="line">    jmp $</span><br><span class="line">    times 510 - ($ - $$) db 0 ; 由于运行环境是bochs的主引导程序,额外需要,此处不关心</span><br><span class="line">    db 0x55,0xaa</span><br></pre></td></tr></table></figure>
+<p>代码从头开始运行(宏定义肯定没了),从第三行开始运行,我们来看调试过程:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&lt;bochs:1&gt; b 0x7c00</span><br><span class="line">&lt;bochs:2&gt; c</span><br><span class="line">(0) Breakpoint 1, 0x00007c00 in ?? ()</span><br><span class="line">Next at t=17178866</span><br><span class="line">(0) [0x000000007c00] 0000:7c00 (unk. ctxt): push bp                   ; 55</span><br><span class="line">&lt;bochs:3&gt; n</span><br><span class="line">Next at t=17178867</span><br><span class="line">(0) [0x000000007c01] 0000:7c01 (unk. ctxt): add byte ptr ds:[bx+si], al ; 0000</span><br><span class="line">&lt;bochs:4&gt; n</span><br><span class="line">Next at t=17178868</span><br><span class="line">(0) [0x000000007c03] 0000:7c03 (unk. ctxt): add byte ptr ds:[bx+si], bh ; 00b80000</span><br><span class="line">&lt;bochs:5&gt; n</span><br><span class="line">Next at t=17178869</span><br><span class="line">(0) [0x000000007c07] 0000:7c07 (unk. ctxt): mov ds, ax                ; 8ed8</span><br><span class="line">&lt;bochs:6&gt; n</span><br><span class="line">Next at t=17178870</span><br><span class="line">(0) [0x000000007c09] 0000:7c09 (unk. ctxt): mov ss, ax                ; 8ed0</span><br><span class="line">&lt;bochs:7&gt; n</span><br><span class="line">Next at t=17178871</span><br><span class="line">(0) [0x000000007c0b] 0000:7c0b (unk. ctxt): mov esp, 0x00007c00       ; 66bc007c0000</span><br><span class="line">&lt;bochs:8&gt; n</span><br><span class="line">Next at t=17178872</span><br><span class="line">(0) [0x000000007c11] 0000:7c11 (unk. ctxt): push ax                   ; 50</span><br><span class="line">&lt;bochs:9&gt; n</span><br><span class="line">Next at t=17178873</span><br><span class="line">(0) [0x000000007c12] 0000:7c12 (unk. ctxt): jmp .-2  (0x00007c12)     ; ebfe</span><br></pre></td></tr></table></figure>
+<p>相信大家看到了,这里多出来了我们没有写的指令<code>push bp</code>,<code>add byte ptr ds:[bx+si], al</code>和<code>add byte ptr ds:[bx+si], bh</code>,而且少了<code>mov ax,0</code>,再看调试过程最右侧的机器码,很明显,我们的<code>_var1</code>和<code>_var2</code>被当成了指令来执行,而这不符合我们代码的预期.<br>将注释的<code>jmp code</code>语句加上后,我们再来调试一下:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">&lt;bochs:1&gt; b 0x7c00</span><br><span class="line">&lt;bochs:2&gt; c</span><br><span class="line">(0) Breakpoint 1, 0x00007c00 in ?? ()</span><br><span class="line">Next at t=17178866</span><br><span class="line">(0) [0x000000007c00] 0000:7c00 (unk. ctxt): jmp .+4  (0x00007c06)     ; eb04</span><br><span class="line">&lt;bochs:3&gt; n</span><br><span class="line">Next at t=17178867</span><br><span class="line">(0) [0x000000007c06] 0000:7c06 (unk. ctxt): mov ax, 0x0000            ; b80000</span><br><span class="line">&lt;bochs:4&gt; </span><br><span class="line">Next at t=17178868</span><br><span class="line">(0) [0x000000007c09] 0000:7c09 (unk. ctxt): mov ds, ax                ; 8ed8</span><br><span class="line">&lt;bochs:5&gt; </span><br><span class="line">Next at t=17178869</span><br><span class="line">(0) [0x000000007c0b] 0000:7c0b (unk. ctxt): mov ss, ax                ; 8ed0</span><br><span class="line">&lt;bochs:6&gt; </span><br><span class="line">Next at t=17178870</span><br><span class="line">(0) [0x000000007c0d] 0000:7c0d (unk. ctxt): mov esp, 0x00007c00       ; 66bc007c0000</span><br><span class="line">&lt;bochs:7&gt; </span><br><span class="line">Next at t=17178871</span><br><span class="line">(0) [0x000000007c13] 0000:7c13 (unk. ctxt): push ax                   ; 50</span><br><span class="line">&lt;bochs:8&gt; </span><br><span class="line">Next at t=17178872</span><br><span class="line">(0) [0x000000007c14] 0000:7c14 (unk. ctxt): jmp .-2  (0x00007c14)     ; ebfe</span><br></pre></td></tr></table></figure>
+<p>此时就完全正确了,在早期实模式下,更可怕的是没有限制的自由,你想访问哪儿都可以,想改变指定内存的数据都是可以的,程序A的数值被程序B就可以随意更改,甚至更改程序A的代码运行逻辑,这是很可怕的,所以就有了保护模式.</p>
+<h4 id="保护模式"><a href="#保护模式" class="headerlink" title="保护模式"></a>保护模式</h4><p>当时急需对电脑中的程序有特权等级的划分,以及代码段,数据段等等的限制,段属性,段基址,段界限,为了提高电脑运行时候的安全性:如果CPU不小心运行到数据段就报错,用户程序试图修改不属于自己的段信息就会报错,这样安全程度就会大大提高,上述需求的实现均基于一种数据结构:段描述符.段描述符通常由一组16字节的数据表示，包含了内存段的各种属性和控制信息.下面是x86-32位下的段描述符的结构:</p>
+<p><img src="/./image/%E6%AE%B5%E6%8F%8F%E8%BF%B0%E7%AC%A6.png" alt="照片"></p>
+<p>我们来看看具体的描述符初始化的环境:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; 文件名 : test.S </span><br><span class="line">; 编译指令 : nasm test.S -f bin -o test.bin</span><br><span class="line"> DA_DRW		equ	92h	; 存在的可读写数据段属性值</span><br><span class="line"> DA_DPL3		equ	  60h	; DPL = 3</span><br><span class="line"> ; 描述符的宏实现</span><br><span class="line"> ; usage: Descriptor Base, Limit, Attr</span><br><span class="line"> ;        Base:  dd</span><br><span class="line"> ;        Limit: dd (low 20 bits available)</span><br><span class="line"> ;        Attr:  dw (lower 4 bits of higher byte are always 0)</span><br><span class="line"> %macro Descriptor 3</span><br><span class="line"> 	dw	%2 &amp; 0FFFFh				; 段界限 1				(2 字节)</span><br><span class="line"> 	dw	%1 &amp; 0FFFFh				; 段基址 1				(2 字节)</span><br><span class="line"> 	db	(%1 &gt;&gt; 16) &amp; 0FFh			; 段基址 2				(1 字节)</span><br><span class="line"> 	dw	((%2 &gt;&gt; 8) &amp; 0F00h) | (%3 &amp; 0F0FFh)	; 属性 1 + 段界限 2 + 属性 2		(2 字节)</span><br><span class="line"> 	db	(%1 &gt;&gt; 24) &amp; 0FFh			; 段基址 3				(1 字节)</span><br><span class="line"> %endmacro ; 共 8 字节</span><br><span class="line"> ; 下面来看一个具体的使用</span><br><span class="line"> LABEL_DESC_DATA:		Descriptor	           0,             0FFFFh, DA_DRW + DA_DPL3					; Data</span><br></pre></td></tr></table></figure>
+<p>动手强的可以来编译看一看,我这里也不卖关子,直接给结果:<br><img src="/./image/bin_%E6%AE%B5%E6%8F%8F%E8%BF%B0%E7%AC%A6.png" alt="照片"></p>
+<p>x86是小端序,这里的机器码转换成上面表格的格式来看,可以看到特权级的确为3.</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">00 00 f2 00 // 高32位</span><br><span class="line">00 00 ff ff // 低32位</span><br></pre></td></tr></table></figure>
+
+<h1 id="RPL"><a href="#RPL" class="headerlink" title="RPL"></a>RPL</h1><p>RPL全称是<code>Request Privilege Level</code>,请求特权级.还记得刚刚说的段描述符吗?段描述符是在内存中的,而且你也看到了这里面段基址,段界限,以及各种属性看起来比较不符合常理,这实际上是为了兼容以前的老古董处理器,Intel公司能有现在的规模,对以前处理器的兼容功不可没,但是兼容归兼容,这鬼东西总不能我用一下就去内存里面整合计算一下吧,即使有很好的代码逻辑进行封装,调用起来很方便,这也是一件很离谱的事情,为什么呢?<strong>效率</strong>.</p>
+<p>内存很快吧?相对于网络和磁盘罢了,跟CPU的速度相比就慢太多了,而跟CPU内部的<code>L1 L2 L3</code>缓存以及寄存器相比就慢太多了,为了保护模式我们能更高效的使用段描述符,我们也急需一个缓存机制来让段描述符和寄存器的效率相当(比如代码描述符,运行一次就要用一次来进行判断有没有越界(跑到数据区)等),能和寄存器效率相当的当然是寄存器.我们在实模式下使用:<code>段地址:偏移地址</code> 进行寻址,保护模式下使用的是<code>段选择子:偏移地址</code>.寄存器是很值钱的,巴不得一个掰两个用,就将实模式下存储段地址的段寄存器用来存储段选择子.</p>
+<h2 id="2-1-段选择子"><a href="#2-1-段选择子" class="headerlink" title="2.1 段选择子"></a>2.1 段选择子</h2><p>段寄存器有缓存机制,且不给程序员开放.段寄存器的缓存是一种用于提高内存访问效率的技术，它允许 CPU 在一段时间内缓存最近访问的段描述符.这些寄存器存储了当前正在执行的指令所在的代码段、数据段等信息.我们可以通过改变段寄存器的选择子来缓存新的段描述符.(希望我说清楚了)</p>
+<p>段选择子的结构:<br><img src="/./image/%E6%AE%B5%E9%80%89%E6%8B%A9%E5%AD%90.png" alt="照片"></p>
+<p>我们可以看到其由三部分构成:描述符索引值(与段描述符是一一映射),TI(GDT表还是LDT表),RPL(终于到正题了).</p>
+<p><strong>请求</strong>,能够<strong>请求</strong>计算机资源的是什么?指令呀!你总不能指望你定义的一个int型数据请求计算机资源吧.<strong>只有指令才有访问,请求其他资源的能力</strong>.所以cs段寄存器段选择子的<code>RPL</code>位表示代码请求别人资源的特权等级,由于cs:eip指向的指令是CPU正在执行的,也称处理器的当前特权级是CS.RPL.至于为什么会有RPL,后面的调用门会zhen</p>
+<h1 id="CPL"><a href="#CPL" class="headerlink" title="CPL"></a>CPL</h1><p>RPL全称是<code>Current Privilege Level</code>,当前特权级.这里你肯定纳闷了,非要单独整个<code>CPL</code>,这不就是cs段寄存器段选择子的<code>RPL</code>,这话是对的,但不完全对.</p>
+<p>为什么这么说呢?它既然没有被淘汰那么一定有自己的道理.还记得我们刚刚说的那句话:<strong>只有指令才有访问,请求其他资源的能力</strong>.访问者任何时刻访问比自己特权级高的资源都是违法的.无论是数据还是代码.在不涉及RPL的前提下我们分类讨论一下:</p>
+<h3 id="数据段"><a href="#数据段" class="headerlink" title="数据段"></a>数据段</h3><p>只有访问者的权限大于等于该 DPL 表示的最低权限才能够继续访问,否则连这个门槛都迈不过去.比如,DPL 为 1 的段描述符,只有特权级为 0、1 的访问者才有资格访问它所代表的资源,特权为 2、3的访问者会被 CPU 拒之门外.</p>
+<p>数据段不允许被比本数据段特权级别更低的代码段访问.</p>
+<h3 id="代码段"><a href="#代码段" class="headerlink" title="代码段"></a>代码段</h3><p>先说结论:只有访问者的权限<strong>等于</strong>该代码段的DPL表示的<strong>最低权限</strong>才能访问.说人话就是只能平级访问,高特权级或者低特权级都不能访问.对于受访者是代码段,实际上是处理器从当前代码段跳到受访代码段上执行,并不是将其当作<strong>数据</strong>处理.的.</p>
+<p>为什么高特权级也不能访问?比如当前代码段特权级是0,被访问代码段特权级是3,特权级3能做的事情,特权级0不能干吗?特权级高的代码不需要低特权代码的帮助.这里我其实也没有很清楚,单这个理由还不能说服我….个人感觉可能为了安全考虑,操作系统默认是对应用程序不信任的,不能以高特权级来运行应用程序….</p>
+<p>当然也有特例,处理器唯一一种从高特权级到低特权级的情况:处理器从中断处理程序中返回到用户程序.因为中断处理程序一般是需要访问硬件,而只有特权级是0的时候可以访问硬件.</p>
+<p>没有发现这种情况下只能平级跳跃,那么该如何运行特权等级低或者高的代码呢?我们不得不佩服先人的智慧,处理器为此提供了多种方法用于从低特权级别代码转移到高特权级代码<strong>且不提升特权级</strong>.</p>
+<ol>
+<li>依从性代码(一致性代码):非系统段的前提下,可以用type字段的C位来表示是否是一致性代码.一致性代码是指如果自己是被转移的目标,则自己的DPL一定要大于等于转移前的CPL.为什么叫依从性代码,是因为其依从改变前代码段的特权级(低的特权级).</li>
+<li>使用门.</li>
+</ol>
+<h1 id="门"><a href="#门" class="headerlink" title="门"></a>门</h1><p><strong>门</strong>（Gate）是另一种形式的描述符，称为门描述符，简称门.和段描述符不同，段描述符用于描述内存段，门描述符则用于描述可执行的代码，比如一段程序、一个过程（例程）或者一个任务.</p>
+<p>门的类型，根据用途不同，分为调用门、中断门&#x2F;陷阱门、任务门.</p>
+<p>调用门：用于不同特权级之间的过程调用；可放在GDT,LDT</p>
+<p>中断门&#x2F;陷阱门：用于中断处理过程使用；可放在IDT</p>
+<p>任务门：对应单个任务，用来执行任务切换.可放在GDT,LDT,IDT</p>
+<p>任务门、调用门都可以用 call 和 jmp 指令直接调用,原因是这两个门描述符都位于描述符表中,要么是 GDT,要么是 LDT,访问它们同普通的段描述符是一样的,也必须要通过选择子,因此只要在 call 或jmp 指令后接任务门或调用门的选择子便可调用它们了.陷阱门和中断门只存在于 IDT 中,因此不能主动调用,只能由中断信号来触发调用.</p>
+<p>RPL的产生就是为了解决系统调用越权问题,系统调用的实现中,调用门(现在更多的是中断门)和中断门最为合适.当程序使用门进行特权级别的转换或跳转时，处理器会比较段选择子中的RPL字段和目标门描述符中的DPL字段.只有当RPL字段不低于DPL字段时，才允许特权级别的转换或跳转.换句话说，RPL提供了一种请求特权级别的机制，而门描述符的DPL则控制了对应门的访问权限.<br><img src="/./image/%E9%97%A8%E7%9A%84%E4%BD%9C%E7%94%A8.png" alt="图片"></p>
+<h2 id="调用门"><a href="#调用门" class="headerlink" title="调用门"></a>调用门</h2><p>调用门是一个描述符,称为门描述符,存储在GDT或者LDT中,虽然该数据结构是在分段机制时候使用,现在的操作系统大多不是用调用门,更多使用的是中断门来实现函数调用,但我们还是来学习一下先人的智慧.通常调用门是通过call或者jmp后面接调用门的段选择子(GDT,LDT表,肯定有段选择子)来使用的.调用门只能向<strong>平级</strong>或者<strong>更高级</strong>转移,<strong>只有<code>retf</code>和<code>iret</code>才能由高特权级到低特权级.</strong>,这句话一会就会用到,我们先来看一下调用门的结构:</p>
+<p><img src="/./image/%E8%B0%83%E7%94%A8%E9%97%A8%E7%BB%93%E6%9E%84.png" alt="图片"></p>
+<p>可以看到其存储了被调用例程的选择子,以及其偏移量.那么具体执行流程如下图所示:</p>
+<p><img src="/./image/%E8%B0%83%E7%94%A8%E9%97%A8%E6%89%A7%E8%A1%8C%E6%B5%81%E7%A8%8B.png" alt="图片"></p>
+<p>解释的很清楚我就不赘述,现在有两个问题:</p>
+<ol>
+<li>如果我<code>call</code>或者<code>jmp</code>指定调用门描述符选择子时,后面接偏移地址会发生什么?比如<code>call gate:0x123</code>.</li>
+<li>我进入对应函数调用的时候,我该如何传入参数?<br>对于第一个问题:什么都不会发生,CPU会自行忽略后面的偏移地址.<br>对于第二个问题:假设我当前特权级是3,函数调用是0.而不同特权级都会有各自的栈,我用户没资格给0特权级的栈压入参数.这不就出问题了嘛?还是那句话:兵来将挡 水来土掩.回过头看调用门结构中,有一个”参数个数”,最多可以传入31(2^5 - 1)个参数.由于用户没权限,所以处理器在硬件层次做了自动拷贝.</li>
+</ol>
+<h3 id="调用门过程的保护"><a href="#调用门过程的保护" class="headerlink" title="调用门过程的保护"></a>调用门过程的保护</h3><p>假设现在有一个特权级为3的程序通过调用门调用特权级为0的系统调用,门描述符中的参数个数为2.为了方便特权级为3的SS和ESP后加<code>_3</code>,特权级为0同理.<br>执行流程:</p>
+<ol>
+<li>目前的特权级为3,分别将两个参数压入当前特权级栈中.</li>
+<li>确定新特权级使用的栈,根据门描述符中的选择子对应的目标代码段的DPL(0),在TSS中查找正确的栈段选择子SS和栈指针ESP.将其作为转换后的新栈.</li>
+<li>检查新栈段选择子的DPL,TYPE等,如果出错则异常处理.</li>
+<li>我们需要清楚门调用完成后还是需要返回至低特权级的,0特权级后是需要保存SS_3和ESP_3的.所以处理器暂存SS_3和ESP_3.且切换步骤2得到的SS_0和ESP_0.</li>
+<li>切换完成后,将SS_3和ESP_3存入0特权级的栈中(处理器资源很珍贵,况且如果有很多调用门呢?总不能全塞处理器里面把),然后处理器硬件层次将步骤1的两个参数拷贝进当前的栈空间.</li>
+<li>不仅仅要存储SS_3和ESP_3,还要存储CS_3和EIP_3,即使使用同一个选择子或者两个选择子使用同一个段也要存储(只要段寄存器被加载,内部缓存都会被刷新,相当于段间远转移,所以需要拷贝CS和EIP).</li>
+<li>加载门描述符中存储的段选择子到CS中,偏移量加载到EIP中.</li>
+</ol>
+<p>这里需要注意的是:如果步骤2发现是平级转移,则不需要存储SS和ESP,以及栈的切换,直接将CS和EIP压栈即可.</p>
+<p>还记得上面加粗的话嘛:<strong>只有<code>retf</code>和<code>iret</code>才能由高特权级到低特权级.</strong>.还是那句话,CPU是很傻的,它是被所有任务共享的,也就是说它根本不知道它刚刚从调用门来提权执行特权级为0的代码,它也不知道它此时应该回到低特权级的地方.此处就用到了<code>retf</code>.处理器不知道自己是从调用门上来的,但是它有权怀疑自己到底是不是从调用门过来的,为以防万一,它从调用门回来时也要做特权级检查.</p>
+<p>执行完回低特权级的流程:</p>
+<ol>
+<li>当处理器执行到<code>retf</code>指令时,它知道这是远返回,所以需要从栈中返回旧栈的地址及返回到低特权级的程序中。这时候它要进行特权级检查。先检查栈中CS选择子,根据其<code>RPL</code>位,即未来的<code>CPL</code>,判断在返回过程中是否要改变特权级.</li>
+<li>进行特权级检查,通过后,弹出栈中数据,EIP设置为EIP_3,CS设置为CS_3,此时ESP_0指向最后一个参数.</li>
+<li>如果<code>retf</code>指令后有参数,则增加ESP_0的数值,为了跳过栈中参数.所以<code>retf + A</code>,A &#x3D; 压入的参数个数 * 压入的参数数量.此时ESP_0指向ESP_3.</li>
+<li>如果步骤1判断出来需要改变特权级,弹出栈中数据,将ESP设置为ESP_3,SS设置为SS_3.</li>
+</ol>
+<p>这里需要注意的是:由于在特权级为0时候,可能将ds,es,fs等段寄存器其中某些设置为特权级来使用了,但是<code>retf</code>后并没有更改回去,且处理器就会将其(段寄存器的DPL &gt; CPL)修改为0.这里就解释了为什么GDT表要专门留一个NULL,从而出发处理器异常,本质上就是为了安全,防止出现漏洞.听着很不可思议吧.怎么会有这样的设计.所以linux使用中断门自己实现了一套更高效的上下文切换.</p>
+<h3 id="调用门的弊端-RPL的必要性"><a href="#调用门的弊端-RPL的必要性" class="headerlink" title="调用门的弊端(RPL的必要性)"></a>调用门的弊端(RPL的必要性)</h3><p>正常情况下仅仅靠DPL和CPL好像也不是不行?的确是这样的.但是吧应用程序也存在恶意程序,比如使用调用门实现memcpy的功能,参数是:数据源所在段的段选择子以及偏移地址,目的所在段的段选择子以及偏移地址,拷贝的字节数量.</p>
+<p><img src="/./image/%E8%B0%83%E7%94%A8%E9%97%A8%E5%BC%8A%E7%AB%AF.png" alt="照片"></p>
+<p>我们先来看左侧调用，正常使用一切安好，但是，如果传入的内核数据源所在段的选择子以及内核的偏移地址呢？这并不是不可能的，GDT表中元素没有很多，暴力一个个尝试也不是不可以。这不就将内核的数据拷贝进了用户的缓冲区，相当于用户可以访问内核才能访问的数据。</p>
+<p>再看右侧的调用，右侧本身是不可行的，也是通过暴力尝试GDT表中的元素找到内核的数据段，这样用户就可以修改内核才能修改的数据。好了，用户既能查看还能修改，保护形同虚设。但是又不能一棒子打死，用户态做不了的事情必须让内核出手，此时RPL就很好的解决了这个问题，问题根儿不能在于CPU不知道访问者的真实身份，它不知道这是用户通过门调用进入内核的，所以这里的RPL就起到这个作用，让CPU知道真正访问这些资源的是谁，内核还是用户。</p>
+<p>现代OS基本上都弃用了调用门，使用中断门来实现系统调用。</p>
+]]></content>
+  </entry>
+  <entry>
+    <title>Learn DGB</title>
+    <url>/2023/12/04/Learn-DGB/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><code>GDB 的全称是 GNU Debugger</code></p>
+<p>“Caveman debugging” 这个词语的使用是一种夸张和幽默的说法，强调了使用最基本工具进行调试的原始感觉，好像程序员是在用石器时代的工具一样。不要只会最简单的调试，掌握更切近实际的高效技巧会为你调试工作带来不小的便利。</p>
+<span id="more"></span>
+
+<h2 id="练习"><a href="#练习" class="headerlink" title="练习"></a>练习</h2><figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">cd yourworkspace</span><br><span class="line">git clone --depth=1 git@github.com:zhendewokusi/Basic_GDB.git</span><br></pre></td></tr></table></figure>
+
+<p>如果你有一定C语言基础，且对gdb的基本使用还不怎么熟练，可以克隆下面仓库，里面有很多代码用以练手，本篇文章的<code>markdown</code>文件也在里面。</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line"><span class="meta prompt_"># </span><span class="language-bash">编译举例</span></span><br><span class="line">gcc basic1.c -g3 -o basic1</span><br></pre></td></tr></table></figure>
+
+<h1 id="GDB基本命令"><a href="#GDB基本命令" class="headerlink" title="GDB基本命令"></a>GDB基本命令</h1><p>b（break的缩写）命令在main()函数入口设置断点</p>
+<p>r（run的缩写）命令开始执行程序，程序执行到main函数时，触发断点。</p>
+<p>n（next的缩写）命令进行单步执行。</p>
+<p>s（step的缩写）：单步调试如果有函数调用，则进入函数；与命令n不同，n是不进入调用的函数的</p>
+<p>函数完成返回，并打印函数返回时的堆栈地址和返回值及参数值等信息。</p>
+<p>watch 表达式：设置一个监视点，一旦被监视的“表达式”的值改变，gdb将强行终止正在被调试的程序。如： <code>watch a</code><br>    rwatch awatch</p>
+<p>x&#x2F;p:x 命令用于查看内存中的数据，而 &#x2F;p 是其中的一种输出格式选项之一。</p>
+<p>where&#x2F;bt ：当前运行的堆栈列表</p>
+<p>call:用于在调试会话中调用一个函数，从而可以直接查看函数的返回值或执行一些函数内的操作。</p>
+<p>up&#x2F;down&#x2F;frame:</p>
+<ol>
+<li><p><strong>up命令：</strong></p>
+<ul>
+<li>用法：<code>up [count]</code></li>
+<li>作用：将当前调用堆栈帧上移 <code>count</code> 个帧。如果没有提供 <code>count</code>，则默认上移一个帧。每个帧对应于一个函数调用。</li>
+</ul>
+</li>
+<li><p><strong>down命令：</strong></p>
+<ul>
+<li>用法：<code>down [count]</code></li>
+<li>作用：将当前调用堆栈帧下移 <code>count</code> 个帧。如果没有提供 <code>count</code>，则默认下移一个帧。</li>
+</ul>
+</li>
+<li><p><strong>frame命令：</strong></p>
+<ul>
+<li>用法：<code>frame [frame-number]</code></li>
+<li>作用：选择调用堆栈中的特定帧。</li>
+</ul>
+</li>
+</ol>
+<ul>
+<li>分割窗口:<br>layout：用于分割窗口，可以一边查看代码，一边测试：<br>layout src：显示源代码窗口<br>layout asm：显示反汇编窗口<br>layout regs：显示源代码&#x2F;反汇编和CPU寄存器窗口<br>layout split：显示源代码和反汇编窗口<br>Ctrl + L：刷新窗口<br>winheight:改变窗口高度</li>
+</ul>
+<p>info :看断点信息，局部变量等等</p>
+<p>command &#x2F; condition:</p>
+<ol>
+<li><strong><code>command</code> 命令：</strong><ul>
+<li><p><code>command</code> 命令允许你定义一个自定义 GDB 命令，该命令可以包含一系列 GDB 命令，这些命令将在程序执行时被执行。</p>
+</li>
+<li><p>语法：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">command</span> [COUNT] [SHELL-COMMANDS]</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>COUNT</code> 表示该命令在程序执行多少次后将被删除。如果省略 <code>COUNT</code>，则该命令会一直存在。</li>
+<li><code>SHELL-COMMANDS</code> 是在达到断点时要执行的 GDB 命令列表。</li>
+</ul>
+</li>
+<li><p>示例：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">(gdb) <span class="built_in">break</span> 10</span><br><span class="line">(gdb) <span class="built_in">command</span> 3</span><br><span class="line">&gt; silent</span><br><span class="line">&gt; <span class="built_in">printf</span> <span class="string">&quot;At line %d\n&quot;</span>, __LINE__</span><br><span class="line">&gt; <span class="built_in">continue</span></span><br><span class="line">&gt; end</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+</ol>
+<p>save breakpoints file_name</p>
+<ol start="2">
+<li><strong><code>condition</code> 命令：</strong><ul>
+<li><p><code>condition</code> 命令用于设置断点的条件。这意味着，只有在满足指定条件时，断点才会中断程序执行。</p>
+</li>
+<li><p>语法：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">condition BREAKPOINT-NUMBER EXPRESSION</span><br></pre></td></tr></table></figure>
+
+<ul>
+<li><code>BREAKPOINT-NUMBER</code> 是断点的编号。</li>
+<li><code>EXPRESSION</code> 是一个表达式，如果该表达式的值为真（非零），则断点会中断程序执行。</li>
+</ul>
+</li>
+<li><p>示例：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">(gdb) <span class="built_in">break</span> 20</span><br><span class="line">(gdb) condition 1 i == 5</span><br></pre></td></tr></table></figure>
+
+<p>这将在程序执行到第 20 行时，只有当变量 <code>i</code> 的值等于 5 时，才会中断程序执行。</p>
+</li>
+</ul>
+</li>
+</ol>
+<p>until:直到多少行，哪个函数….</p>
+<p>tbreak:临时断点</p>
+<h1 id="GDB打印复杂数据结构"><a href="#GDB打印复杂数据结构" class="headerlink" title="GDB打印复杂数据结构"></a>GDB打印复杂数据结构</h1><p>正常数据结构太难看，让它输出好看点<br><code>.gdbinit</code>文件</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">set print pretty on</span><br><span class="line">set print array-indexes on</span><br></pre></td></tr></table></figure>
+
+<h1 id="宏定义"><a href="#宏定义" class="headerlink" title="宏定义"></a>宏定义</h1><p>GCC的调试选项 -g<br>我们知道，要想用GDB进行调试，必须在用GCC编译时加上“-g”选项。但很多童鞋可能不知道的是，和优化选项“-Ox”一样，调试选项“-g”也有几个等级可选：</p>
+<p>-g 默认选项，同-g2</p>
+<p>-g0 不生成任何调试信息，和编译时不加“-g”是一样的。</p>
+<p>-g1 生成最少量的调试信息，这些信息足够用来通过backtrace查看调用栈符号信息。主要包括了函数声明、外部变量和行号等信息，但是不包含局部变量信息。这个选项比较少用。</p>
+<p>-g2 生成足够多的调试信息，可以用GDB进行正常的程序调试，这个是默认选项。</p>
+<p>-g3 在-g2的基础上产生更多的信息，如宏定义。</p>
+<p>可见，我们编译时加的“-g”选项，其实等同于“-g2”，它产生了足够多的调试信息，我们可以用gdb查看调用栈、查看局部变量等。但是，要想查看宏定义，则必须要使用“-g3”选项。</p>
+<p>开<code>g3</code>才能输出宏</p>
+<h1 id="GDB-Dynamic-Printf"><a href="#GDB-Dynamic-Printf" class="headerlink" title="GDB Dynamic Printf"></a>GDB Dynamic Printf</h1><p>问题：</p>
+<ul>
+<li><p>代码添加打印信息进行调试，突然发现添加打印的位置不对，或者别的地方也需要添加打印信息。</p>
+</li>
+<li><p>于是，重新修改源码，重新添加打印，重新编译，重新部署，重新运行，重新调试，重新分析。</p>
+</li>
+<li><p>当我们费了九牛二虎之力把这些都弄好之后，很不幸地又发现了新的问题，然后不得不反复进行这些过程。<br>误而崩溃，GDB 会在进程终止后无法再执行 call 命令。你需要在程序崩溃之前设置调试信息，还必须从程序中删除掉。</p>
+</li>
+</ul>
+<p>上面问题你或许可以克服，新的问题：大型项目printf太麻烦，编译时间太久。还要修改源码。</p>
+<p>那么，有没有一种方法，既不需要修改源码，又能随时在程序中任何地方任意添加打印信息呢？</p>
+<p>设置动态打印的命令是dprintf，格式如下：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">dprintf location,format string,arg1,arg2,...</span><br></pre></td></tr></table></figure>
+
+<p>dprintf命令和C语言中的printf的用法很相似，支持格式化打印。</p>
+<p>相比printf函数，dprintf命令多了一个location参数，用于指定动态打印被触发的位置。</p>
+<p>和break命令设置断点时一样，location可以是文件名:行号、函数名、或者具体的地址等。</p>
+<p>除了location外，剩余的几个参数，就和printf()函数一致了。format指定字符串打印的格式，后面几个参数指定打印的数据来源。</p>
+<h2 id="保存断点信息"><a href="#保存断点信息" class="headerlink" title="保存断点信息"></a>保存断点信息</h2><p>为了解决上面提到的问题，GDB很贴心地提供了对断点信息保存和加载的功能。</p>
+<p>GDB中，可以把当前所设置的各种类型的断点信息全部保存在一个脚本文件中。这其中当然也包括dprintf设置的动态打印信息。</p>
+<p>只需要执行下面的命令即可：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">save breakpoints file_name</span><br></pre></td></tr></table></figure>
+<p>这条命令会把当前所有的断点信息都保存在file_name指定的文件中。</p>
+<p>等下次进行调试时，可以把file_name文件中的断点信息重新加载起来。有两种方法：</p>
+<ol>
+<li><p>启动GDB时使用“-x file_name”参数。</p>
+</li>
+<li><p>在GDB中执行source file_name命令。</p>
+</li>
+</ol>
+<p>gdb后加<code>-x</code>加<code>file_name</code>加载断点信息。</p>
+<h1 id="GDB-Dynamic-Printf-多余吗"><a href="#GDB-Dynamic-Printf-多余吗" class="headerlink" title="GDB Dynamic Printf 多余吗?"></a>GDB Dynamic Printf 多余吗?</h1><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;signal.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> global = <span class="number">6</span>;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> <span class="title function_">alarm_handler</span><span class="params">()</span> &#123;</span><br><span class="line">    global++;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc,<span class="type">char</span>* argv[])</span> &#123;</span><br><span class="line">    <span class="type">int</span> a,b,c;</span><br><span class="line"></span><br><span class="line">    signal(SIGALRM, alarm_handler);</span><br><span class="line">    alarm(<span class="number">1</span>);</span><br><span class="line"></span><br><span class="line">    a = <span class="number">9</span>;</span><br><span class="line">    b = <span class="number">9</span>;</span><br><span class="line">    c = <span class="number">6</span>;</span><br><span class="line"></span><br><span class="line">    c = (a + b) / (global - c);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h2 id="普通断点的问题"><a href="#普通断点的问题" class="headerlink" title="普通断点的问题"></a>普通断点的问题</h2><p>我们前面尝试了单步执行，以及直接在第23行设置断点并打印变量的方式，可程序都能够正常执行结束，浮点异常错误无法重现。</p>
+<p>这两种方式存在的共同问题是，<strong>在程序触发断点后，需要和用户进行交互，用户必须手动输入命令并恢复程序的执行。而和用户交互，势必引入延迟。</strong></p>
+<p>实际上，无论是单步执行，还是在断点触发后打印a、b、c、global_variable的值，都无法b保证程序在在1秒钟内执行完毕。因此，第17行设置的闹钟就会到期。</p>
+<p><strong>尽管我们用GDB调试程序时，被调试程序本身的执行被暂时停止，但是alarm函数设置的闹钟是由底层OS内核提供的服务。无论我们的程序执行是否被暂停，OS内核仍然会在设置的闹钟到期后，向应用程序发送SIGALRM信号。</strong></p>
+<p>如此以来，无论我们是用step命令还是continue命令恢复程序执行，程序都会首先处理SIGALRM信号，然后才去执行接下来的代码。</p>
+<p>在SIGALRM的处理函数alarm_handler()中，会把global_variable加1，它的值变成了5,。接下来执行第23行代码时，global_variable - c的值就变成了1，当然不会再触发除零错误了。</p>
+<p>接下来，我们用GDB的动态打印功能来调试一下。</p>
+<h1 id="反向调试"><a href="#反向调试" class="headerlink" title="反向调试"></a>反向调试</h1><p>反向调试技术的核心原理，简单来说，是在程序运行中，记录每一条指令对程序执行的所有状态变化，包括变量、寄存器、内存的数据变化等，并将这些信息存储在一个history文件中。当需要回溯到过去的状态时，调试器会按照相反的顺序逐条指令恢复这些状态，使得程序的执行状态回到已经被记录的任意时间点。</p>
+<ul>
+<li>reverse-next(rc): 参考next(n), 逆向执行一行代码，遇函数调用不进入</li>
+<li>reverse-nexti(rni): 参考nexti(ni), 逆向执行一条指令，与函数调用不进入</li>
+<li>reverse-step(rs): 参考step(s), 逆向执行一行代码，遇函数调用则进入</li>
+<li>reverse-stepi(rsi): 参考setpi(si)， 逆向执行一条指令，与函数调用则进入</li>
+<li>reverse-continue(rc): 参考continue(c), 逆向继续执行</li>
+<li>reverse-finish: 参考finish，逆向执行，一直到函数入口处</li>
+<li>reverse-search(): 参考search，逆向搜索</li>
+<li>set exec-direction reverse: 设置程序逆向执行，执行完此命令后，所有常用命令如next, nexti, step, stepi, continue、finish等全部都变成逆向执行</li>
+<li>set exec-direction forward: 设置程序正向执行，这也是默认的设置</li>
+</ul>
+<p><strong>在绝大多数环境下，在使用这些反向调试命令之前，必须要先通过record命令让GDB把程序执行过程中的所有状态信息全部记录下来。通常是在程序运行起来之后，先设置断点让让程序停下来，然后输入record命令，开启状态信息记录，然后再继续执行。</strong></p>
+<ul>
+<li>record: 记录程序执行过程中所有状态信息</li>
+<li>record stop: 停止记录状态信息</li>
+<li>record goto: 让程序跳转到指定的位置, 如record goto start、record goto end、record goto n</li>
+<li>record save filename: 把程序执行历史状态信息保存到文件，默认名字是gdb_record.process_id</li>
+<li>record restore filename: 从历史记录文件中恢复状态信息</li>
+<li>show record full insn-number-max：查看可以记录执行状态信息的最大指令个数，默认是200000</li>
+<li>set record full insn-number-max limit：设置可以记录执行状态信息的最大指令个数</li>
+<li>set record full insn-number-max unlimited：记录所有指令的执行状态信息</li>
+</ul>
+]]></content>
+      <tags>
+        <tag>GDB</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>TCP 超时计时器的管理</title>
+    <url>/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
+<h2 id="每连接单一计时器"><a href="#每连接单一计时器" class="headerlink" title="每连接单一计时器"></a>每连接单一计时器</h2><p>我们都能想到，如果给每一个<code>TCP</code>分段都分配一个计时器，这是最直接的方法。但是这带来了巨大的内存开销和调度开销。难不成一个<code>TCP</code>通信的服务器负担全用来给分段计时间，这太离谱了，有没有更好的办法，先人已经为我们想到了一个适用至今的方法：采取每个TCP连接单一计时器的设计。</p>
+<p>首先我们要明确，这个超时计时器需要实现什么功能：</p>
+<ol>
+<li>有报文<strong>长时间</strong>没有接收到，必须提示超时。</li>
+<li>这个<strong>长时间</strong>不能太长也不能太短。</li>
+</ol>
+<p>如果这里的超时时间太短了，会导致正常传输的数据包被当成无效数据，网络中充斥大量无效重传，浪费网络资源；如果超时时间太长，就会导致数据传输效率的太低，网络延迟提高。</p>
+<p>因此RFC2988制定了下面的原则：</p>
+<ol>
+<li>每次发送包含数据的数据包（包括重传）时，如果定时器没有运行，则启动定时器。如果定时器在运行，就什么也不做。</li>
+<li>当所有未完成的数据都被确认后，关闭定时器。</li>
+<li>当接收到新数据的ACK时候，重新启动定时器。<br>当定时器超时时，执行下面的操作：</li>
+<li>指数退避，发送方设置 RTO 为之前的二倍，并且关闭定时器。</li>
+<li>重传 TCP 接收方尚未确认的最早的报文段。</li>
+<li>启动重传定时器。</li>
+</ol>
+<p>为什么要有原则 3 ？</p>
+<p>假设下面的情况，如果在定时器快到期的时候发送一部分数据。这样在超时前，只能收到定时器刚开始运行时发送的报文段，后续的正常数据包会被当作超时，因此后续的数据都需要重传，这太考验网络的负载和使用者的耐心了。有了原则3，好处自然不用我多说，保证一部分正常数据的不必要重传。</p>
+<p>还有就是如果一个ack到来了，说明后续的ack大概率也会到达，即使出现了丢失，也会在两倍的 RTO 内被重传。为什么是两倍呢？举个简单的例子，A和B是两个同时发送的报文段的ACK（假设，一般会将其合并成一个ACK进行发送），发送方在无限接近超时时候收到了A,此时会将定时器重新启动，如果B数据包在网络中丢失，那么发送方再等待一个 RTO 就会知道 B 丢失。这样算下来不就是两倍的 RTO 内会被重传嘛。</p>
+<h2 id="RTO的计算"><a href="#RTO的计算" class="headerlink" title="RTO的计算"></a>RTO的计算</h2><p>为了计算RTO,TCP的发送方需要维护两个变量：SRTT(平滑往返时间，英文：Smoothed Round-Trip Time)和RTTAR（往返时间变化，英文：Returns the Round Trip Time Variance）。</p>
+<p>SRTT、RTTAVR和RTO的计算规则如下：</p>
+<ol>
+<li>测量RTT之前，需要将RTO设置为3秒，此时指数退避依旧有效。<br> 该计时器实际上会产生2.5秒到3秒的数值。因为使用粒度为G的心跳计时器的实现不应该将计时器设置低于<code>2.5 + G</code>秒。</li>
+<li>当进行第一个 RTT 测量时候，主机必须如下设置:<ul>
+<li>SRTT &lt;- R</li>
+<li>RTTVAR &lt;- R&#x2F;2</li>
+<li>RTO &lt;- SRTT + max(G,K * RTTVAR) 这里的K为4</li>
+</ul>
+</li>
+<li>当进行了一个后续的往返时间测量 R’ 时，主机必须设置：<ul>
+<li>RTTVAR &lt;- (1 - beta) * RTTVAR + beta * | SRTT - R’|</li>
+<li>SRTT &lt;- (1 - alpha) * SRTT + alpha * R’<br>这里的alpha为1&#x2F;8，beta &#x3D; 1&#x2F;4。（2988里面说是 JK88 建议的，应该是个1988年的论文吧，没找到）。<br>这里需要注意的是，计算RTTVAR时用到的SRTT，必须是分配前的数值，也就是说，这两个计算的顺序不能改变。<br>计算 RTO 时候，如果其小于 1 秒，上取整。RTO可以设置最大值，但是最大值应该大于60秒。</li>
+</ul>
+</li>
+</ol>
+<h2 id="获取-RTT-的样本"><a href="#获取-RTT-的样本" class="headerlink" title="获取 RTT 的样本"></a>获取 RTT 的样本</h2><p>TCP<strong>必须</strong>使用<a href="https://www.geeksforgeeks.org/karns-algorithm-for-optimizing-tcp/">Karn-Partridge 算法</a>来获取准确的消息往返时间估计。由于重传的模糊性，举个简单的例子，如果一个报文段发送了一次重传，发送方接受到ACK，但是此时的ACK到底是重传报文段的确认还是第一次发送的报文段的确认，这就是重传的模糊性，发送方不知道到底是哪个报文段的确认，这样得到的RTT会有很大的偏差，当然这个问题可以由TCP的时间戳选项来解决。该算法会忽略重传的数据段。仅使用明确的确认（即仅传送一次的段的确认）来估计往返时间。Karn 算法的第一部分规定，当存在重传模糊性时，RTT 值将被忽略，而不是集成到 SRTT 中。</p>
+<p>但是也有问题，这么简单粗暴的方法，举个例子，如果TCP延迟显著增加后发送数据，TCP计算超时，并且根据之前的RTT来重新传输数据，极端情况下，TCP忽略所有的重传数据包的RTT,RTO永远不会更新。</p>
+<p>其第二部分就是考虑到了这种不太理想的网络情况。为每次重传的RTO设置“退避因子”，也就是常说的指数退避。在不需要重传的成功数据传输发生之前，不会重置退避因子。该部分会放置网络的拥塞，使其能从任何拥塞问题中恢复，还保证了RTT信息不会丢失，当数据成功传输而无需重传时，可以将伴随的RTT测量添加到SRTT中。</p>
+<p>目前很多TCP实现了时间戳，这样就方便多了，发送端再也不需要保存发送分段的时间了，只需要将其放入协议头的时间戳字段，然后接收端将其回显在ACK即可，然后发送端收到ACK后，取出时间戳，和当前时间做算术差，即可完成一次RTT的测量。</p>
+<p>需要注意的是：TCP 实现可以在多次回退计时器后清除 SRTT 和 RTTVAR，因为在这种情况下当前 SRTT 和 RTTVAR 很可能是假的。一旦 SRTT 和 RTTVAR 被清除，它们应该采集的下一个 RTT 样本进行初始化（RTO的第二步）。</p>
+]]></content>
+      <tags>
+        <tag>TCP</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>epoll如何实现IO多路复用</title>
+    <url>/2023/12/20/epoll%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8/</url>
+    <content><![CDATA[<p>大一暑假完成了一个C++在线聊天室，对epoll的应用仅仅在于那三个函数：</p>
+<ul>
+<li>epoll_create</li>
+<li>epoll_ctl</li>
+<li>epoll_wait</li>
+</ul>
+<p>看看epoll的源码实现，理解epoll是如何实现IO多路复用的。这里我看的是linux2.6.39.4版本的源码，在<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source">在线网站</a>可以查看。如果有错误敬请斧正。</p>
+<h2 id="accept-系统调用创建新的-socket-对象"><a href="#accept-系统调用创建新的-socket-对象" class="headerlink" title="accept 系统调用创建新的 socket 对象"></a>accept 系统调用创建新的 socket 对象</h2><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// net/socket.c:1478</span></span><br><span class="line">SYSCALL_DEFINE4(accept4, <span class="type">int</span>, fd, <span class="keyword">struct</span> sockaddr __user *, upeer_sockaddr,</span><br><span class="line">		<span class="type">int</span> __user *, upeer_addrlen, <span class="type">int</span>, flags)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">socket</span> *<span class="title">sock</span>, *<span class="title">newsock</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">newfile</span>;</span></span><br><span class="line">	<span class="type">int</span> err, len, newfd, fput_needed;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_storage</span> <span class="title">address</span>;</span></span><br><span class="line">    <span class="comment">// 0. 关于 flags 的处理</span></span><br><span class="line">	<span class="keyword">if</span> (flags &amp; ~(SOCK_CLOEXEC | SOCK_NONBLOCK))</span><br><span class="line">		<span class="keyword">return</span> -EINVAL;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (SOCK_NONBLOCK != O_NONBLOCK &amp;&amp; (flags &amp; SOCK_NONBLOCK))</span><br><span class="line">		flags = (flags &amp; ~SOCK_NONBLOCK) | O_NONBLOCK;</span><br><span class="line">    <span class="comment">// 1. 根据 fd 查找到监听的 socket</span></span><br><span class="line">	sock = sockfd_lookup_light(fd, &amp;err, &amp;fput_needed);</span><br><span class="line">	<span class="keyword">if</span> (!sock)</span><br><span class="line">		<span class="keyword">goto</span> out;</span><br><span class="line"></span><br><span class="line">	err = -ENFILE;</span><br><span class="line">    <span class="comment">// 2. alloc 一个新的 socket 对象</span></span><br><span class="line">	newsock = sock_alloc();</span><br><span class="line">	<span class="keyword">if</span> (!newsock)</span><br><span class="line">		<span class="keyword">goto</span> out_put;</span><br><span class="line">    <span class="comment">// 初始化新的socket部分信息</span></span><br><span class="line">	newsock-&gt;type = sock-&gt;type;</span><br><span class="line">	newsock-&gt;ops = sock-&gt;ops;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * We don&#x27;t need try_module_get here, as the listening socket (sock)</span></span><br><span class="line"><span class="comment">	 * has the protocol module (sock-&gt;ops-&gt;owner) held.</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">     <span class="comment">// 在套接字创建的过程中，为了确保模块在使用期间不会被卸载，需要增加模块的引用计数。</span></span><br><span class="line">	__module_get(newsock-&gt;ops-&gt;owner);</span><br><span class="line">    <span class="comment">// 3. 为新的 socket 分配一个新的 file 对象</span></span><br><span class="line">	newfd = sock_alloc_file(newsock, &amp;newfile, flags);</span><br><span class="line">	<span class="keyword">if</span> (unlikely(newfd &lt; <span class="number">0</span>)) &#123;</span><br><span class="line">		err = newfd;</span><br><span class="line">		sock_release(newsock);</span><br><span class="line">    </span><br><span class="line">	err = security_socket_accept(sock, newsock);</span><br><span class="line">	<span class="keyword">if</span> (err)</span><br><span class="line">		<span class="keyword">goto</span> out_fd;</span><br><span class="line">    <span class="comment">// 4. 接收连接</span></span><br><span class="line">	err = sock-&gt;ops-&gt;accept(sock, newsock, sock-&gt;file-&gt;f_flags);</span><br><span class="line">	<span class="keyword">if</span> (err &lt; <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">goto</span> out_fd;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (upeer_sockaddr) &#123;</span><br><span class="line">		<span class="keyword">if</span> (newsock-&gt;ops-&gt;getname(newsock, (<span class="keyword">struct</span> sockaddr *)&amp;address,</span><br><span class="line">					  &amp;len, <span class="number">2</span>) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">			err = -ECONNABORTED;</span><br><span class="line">			<span class="keyword">goto</span> out_fd;</span><br><span class="line">		&#125;</span><br><span class="line">		err = move_addr_to_user((<span class="keyword">struct</span> sockaddr *)&amp;address,</span><br><span class="line">					len, upeer_sockaddr, upeer_addrlen);</span><br><span class="line">		<span class="keyword">if</span> (err &lt; <span class="number">0</span>)</span><br><span class="line">			<span class="keyword">goto</span> out_fd;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* File flags are not inherited via accept() unlike another OSes. */</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 5. 将新的文件添加到当前进程的打开文件列表</span></span><br><span class="line">	fd_install(newfd, newfile);</span><br><span class="line">	err = newfd;</span><br><span class="line"></span><br><span class="line">out_put:</span><br><span class="line">	fput_light(sock-&gt;file, fput_needed);</span><br><span class="line">out:</span><br><span class="line">	<span class="keyword">return</span> err;</span><br><span class="line">out_fd:</span><br><span class="line">	fput(newfile);</span><br><span class="line">	put_unused_fd(newfd);</span><br><span class="line">	<span class="keyword">goto</span> out_put;</span><br><span class="line">&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">SYSCALL_DEFINE3(accept, <span class="type">int</span>, fd, <span class="keyword">struct</span> sockaddr __user *, upeer_sockaddr,</span><br><span class="line">		<span class="type">int</span> __user *, upeer_addrlen)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">return</span> sys_accept4(fd, upeer_sockaddr, upeer_addrlen, <span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="0-关于-flags-的处理"><a href="#0-关于-flags-的处理" class="headerlink" title="0. 关于 flags 的处理"></a>0. 关于 flags 的处理</h3><p>可以看到这里<code>accept</code>和<code>accept4</code>的区别仅仅是多了一个<code>flags</code>的参数，如果想了解这些<code>flags</code>的设置可以自行搜索。如果使用<code>accept</code>，本质上运行的是<code>flags</code>参数为0的<code>accept4</code>。</p>
+<h3 id="1-根据-fd-查找到监听的-socket"><a href="#1-根据-fd-查找到监听的-socket" class="headerlink" title="1. 根据 fd 查找到监听的 socket"></a>1. 根据 fd 查找到监听的 socket</h3><figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// include/asm-generic/error-base.h</span></span><br><span class="line"><span class="comment">// 可以看到这个宏对应没有找到套接字对象</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span>	EBADF		 9	<span class="comment">/* Bad file number */</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// net/socket.c:450</span></span><br><span class="line"><span class="type">static</span> <span class="keyword">struct</span> socket *<span class="title function_">sockfd_lookup_light</span><span class="params">(<span class="type">int</span> fd, <span class="type">int</span> *err, <span class="type">int</span> *fput_needed)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">file</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">socket</span> *<span class="title">sock</span>;</span></span><br><span class="line"></span><br><span class="line">	*err = -EBADF;</span><br><span class="line">	file = fget_light(fd, fput_needed);</span><br><span class="line">	<span class="keyword">if</span> (file) &#123;</span><br><span class="line">		sock = sock_from_file(file, err);</span><br><span class="line">		<span class="keyword">if</span> (sock)</span><br><span class="line">			<span class="keyword">return</span> sock;</span><br><span class="line">		fput_light(file, *fput_needed);</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里还有另一个参数<code>fput_needed</code>，该参数是在<code>fget_light</code>内被初始化的，感兴趣的读者可以去看看,路径是<code>/fs/file_table.c</code>第331行，简单说一下其作用：</p>
+<ul>
+<li>如果 fput_needed 的值为 1，表示文件引用计数已经成功增加，调用者在使用完文件后需要调用<code>fput</code>函数来减少引用计数。</li>
+<li>如果 fput_needed 的值为 0，表示文件引用计数未增加，可能由于并发操作中文件已被释放，调用者无需调用<code>fput</code>。</li>
+</ul>
+<p>套接字分为两类：监听套接字和连接套接字。监听套接字是使用<code>socket()</code>创建一个套接字，<code>bind()</code>将其绑定到一个特定的本地地址和端口，<code>listen()</code>开始监听连接请求。连接套接字是使用<code>accept()</code>来创建与特定客户进行通信。而创建连接套接字的时候会使用监听套接字的部分设置（比如地址簇A、套接字类型、协议类型等等），当然连接套接字也有自己的一些设置，比如新的本地端口号等等。这里<code>sockfd_lookup_light</code>函数的作用是通过<code>fd</code>来找到监听套接字的<code>socket</code>结构体指针。准备后面的部分设置共享。</p>
+<h3 id="2-alloc-一个新的-socket-对象"><a href="#2-alloc-一个新的-socket-对象" class="headerlink" title="2. alloc 一个新的 socket 对象"></a>2. alloc 一个新的 socket 对象</h3><p>这里首先调用<code>sock_alloc</code>函数申请一个新的<code>socket</code>对象。然后将监听套接字的<code>socket</code>对象的<code>type</code>和协议操作函数集合<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/net.h#L160">ops</a>赋给新<code>socket</code>对象。这里的<code>ops</code>里面主要是协议族，内核模块，以及一些需要的函数，感兴趣的可以去看看。需要注意的是这里的<code>ops</code>是一个指针，并不是将其整体复制了一份。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">socket</span> &#123;</span></span><br><span class="line">	socket_state		state;</span><br><span class="line">	kmemcheck_bitfield_begin(type);</span><br><span class="line">	<span class="type">short</span>			type;</span><br><span class="line">	kmemcheck_bitfield_end(type);</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span>		flags;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">socket_wq</span> __<span class="title">rcu</span>	*<span class="title">wq</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span>		*<span class="title">file</span>;</span>  <span class="comment">// file descriptor</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sock</span>		*<span class="title">sk</span>;</span>    <span class="comment">// 核心成员</span></span><br><span class="line">	<span class="type">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">proto_ops</span>	*<span class="title">ops</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<h3 id="3-为新的-socket-分配一个新的-file-对象"><a href="#3-为新的-socket-分配一个新的-file-对象" class="headerlink" title="3. 为新的 socket 分配一个新的 file 对象"></a>3. 为新的 socket 分配一个新的 file 对象</h3><p>这里的<code>file</code>对象其实就表示打开的文件对象，也就是文件描述符。使得连接套接字能通过文件描述符进行访问和操作。对其感兴趣可以点击该<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/fs.h#L933">链接</a>查看file结构体的具体细节。</p>
+<p>因为连接套接字的<code>socket</code>对象的<code>file</code>指针还是空的。接下来调用<code>sock_alloc_file</code>函数来申请并且初始化该对象。并且将其设置在<code>sock-&gt;file</code>对象。具体代码点<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/socket.c#L389">链接</a>。</p>
+<p>新的socket对象-&gt;file-&gt;f_op-&gt;poll<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/fs.h#L1545">函数</a>指向的是sock_poll，之后会用到的。</p>
+<h3 id="4-接收连接"><a href="#4-接收连接" class="headerlink" title="4. 接收连接"></a>4. 接收连接</h3><p>这里介绍另一个<code>socket</code>对象中的核心成员<code>sock</code>。该<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/net/sock.h#L238">结构体</a>非常大，其中发送队列、接收数据包的队列、错误队列、缓存锁、异步等待的队列、数据包的哈希值，数量等核心数据结构都在这里。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">   <span class="comment">// 安全性检查</span></span><br><span class="line">err = security_socket_accept(sock, newsock);</span><br><span class="line"><span class="keyword">if</span> (err)</span><br><span class="line">	<span class="keyword">goto</span> out_fd;</span><br><span class="line"></span><br><span class="line">err = sock-&gt;ops-&gt;accept(sock, newsock, sock-&gt;file-&gt;f_flags);</span><br><span class="line"><span class="keyword">if</span> (err &lt; <span class="number">0</span>)</span><br><span class="line">	<span class="keyword">goto</span> out_fd;</span><br></pre></td></tr></table></figure>
+<p>这里的<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/tipc/socket.c#L1491">accept</a>对应的是<code>inet-accept</code>。它会从握手队列中直接获取创建好的<code>sock</code>。</p>
+<h3 id="5-将新的文件添加到当前进程的打开文件列表"><a href="#5-将新的文件添加到当前进程的打开文件列表" class="headerlink" title="5. 将新的文件添加到当前进程的打开文件列表"></a>5. 将新的文件添加到当前进程的打开文件列表</h3><p>当 file、socket、sock 等关键内核对象创建完毕以后，剩下要做的一件事情就是把它挂到当前进程的打开文件列表中就行了。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// fs/file.c</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">fd_install</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span> fd, <span class="keyword">struct</span> file *file)</span></span><br><span class="line">&#123;</span><br><span class="line">    __fd_install(current-&gt;files, fd, file);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> __fd_install(<span class="keyword">struct</span> files_struct *files, <span class="type">unsigned</span> <span class="type">int</span> fd,</span><br><span class="line">        <span class="keyword">struct</span> file *file)</span><br><span class="line">&#123;</span><br><span class="line">    fdt = files_fdtable(files);</span><br><span class="line">    BUG_ON(fdt-&gt;fd[fd] != <span class="literal">NULL</span>);</span><br><span class="line">    rcu_assign_pointer(fdt-&gt;fd[fd], file);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<!-- [socket()](https://elixir.bootlin.com/linux/v2.6.39.4/source/net/socket.c#L1294)
+[socket_create](https://elixir.bootlin.com/linux/v2.6.39.4/source/net/socket.c#L1270) -->
+
+<h2 id="epoll-create-的实现"><a href="#epoll-create-的实现" class="headerlink" title="epoll_create 的实现"></a>epoll_create 的实现</h2><p>用户进程在调用<code>epoll_create</code>时，内核会创建一个<code>eventpoll</code>对象。将其关联到当前进程的已打开文件列表中。<code>epoll_create</code><a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L1306">源码</a>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// fs/eventpool.c</span></span><br><span class="line">SYSCALL_DEFINE1(epoll_create1, <span class="type">int</span>, flags)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> *<span class="title">ep</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line">	<span class="comment">// flags处理</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// 1. ep_alloc</span></span><br><span class="line">	error = ep_alloc(&amp;ep);</span><br><span class="line">	<span class="comment">// 错误处理</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// 2. 创建匿名的文件对象以及文件描述符</span></span><br><span class="line">	error = anon_inode_getfd(<span class="string">&quot;[eventpoll]&quot;</span>, &amp;eventpoll_fops, ep,</span><br><span class="line">				 O_RDWR | (flags &amp; O_CLOEXEC));</span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="1-ep-alloc"><a href="#1-ep-alloc" class="headerlink" title="1. ep_alloc"></a>1. ep_alloc</h3><p><code>eventpoll</code>的<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L158">实现</a>，这里我们只看主要的成员：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// fs/eventpool.c</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> &#123;</span></span><br><span class="line">    <span class="comment">// 等待队列，链表</span></span><br><span class="line">	<span class="type">wait_queue_head_t</span> wq;</span><br><span class="line">	<span class="comment">// 接收就绪的描述符，链表</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">rdllist</span>;</span></span><br><span class="line">	<span class="comment">// 红黑树</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">rb_root</span> <span class="title">rbr</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>成员作用：</p>
+<ul>
+<li><strong>wq</strong>：软中断数据就绪的时候会通过wq来找到阻塞在epoll对象上的用户<strong>进程</strong>。等待队列链表用于管理等待事件发生的进程。</li>
+<li><strong>rbr</strong>：红黑树用于存储被监控的文件描述符（fd）的数据结构及其状态信息。</li>
+<li><strong>rdllist</strong>：当有连接就绪时，会将就绪的连接放在该链表中。这样就不用遍历整棵树。<br>然后在<code>ep_alloc</code>里面实现初始化工作，<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L748">源码</a>：<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">ep_alloc</span><span class="params">(<span class="keyword">struct</span> eventpoll **pep)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">user_struct</span> *<span class="title">user</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> *<span class="title">ep</span>;</span></span><br><span class="line"></span><br><span class="line">	user = get_current_user();</span><br><span class="line">	error = -ENOMEM;</span><br><span class="line">	<span class="comment">// ep的初始化操作</span></span><br><span class="line">	ep = kzalloc(<span class="keyword">sizeof</span>(*ep), GFP_KERNEL);</span><br><span class="line">	<span class="keyword">if</span> (unlikely(!ep))</span><br><span class="line">		<span class="keyword">goto</span> free_uid;</span><br><span class="line"></span><br><span class="line">	spin_lock_init(&amp;ep-&gt;lock);</span><br><span class="line">	mutex_init(&amp;ep-&gt;mtx);</span><br><span class="line">	init_waitqueue_head(&amp;ep-&gt;wq);</span><br><span class="line">	init_waitqueue_head(&amp;ep-&gt;poll_wait);</span><br><span class="line">	INIT_LIST_HEAD(&amp;ep-&gt;rdllist);</span><br><span class="line">	ep-&gt;rbr = RB_ROOT;</span><br><span class="line">	ep-&gt;ovflist = EP_UNACTIVE_PTR;</span><br><span class="line">	ep-&gt;user = user;</span><br><span class="line"></span><br><span class="line">	*pep = ep;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">free_uid:</span><br><span class="line">	free_uid(user);</span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ul>
+<h3 id="2-创建匿名的文件对象以及文件描述符"><a href="#2-创建匿名的文件对象以及文件描述符" class="headerlink" title="2. 创建匿名的文件对象以及文件描述符"></a>2. 创建匿名的文件对象以及文件描述符</h3><p>匿名文件对象是内核用于表示一些临时或者有特殊用途的文件对象，其是在内存中动态创建和管理的，常见用于进程间通信（比如<code>pipe</code>、<code>fifo</code>）、临时文件、内核模块之间的通信以及一些特殊的操作。通过将文件挂接在单个 inode 上来创建新文件。这对于不需要拥有完整 inode 即可正确运行的文件非常有用。使用 anon_inode_getfd() 创建的所有文件将共享一个 inode，从而节省内存并避免文件&#x2F;inode&#x2F;dentry 设置的代码重复。将<code>epoll</code>和文件描述符关联起来，内核也更方便管理和处理被监视的文件描述符的事件。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">anon_inode_getfd</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *name, <span class="type">const</span> <span class="keyword">struct</span> file_operations *fops,</span></span><br><span class="line"><span class="params">		     <span class="type">void</span> *priv, <span class="type">int</span> flags)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error, fd;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">file</span>;</span></span><br><span class="line">	<span class="comment">// 获取一个未被使用的文件描述符</span></span><br><span class="line">	error = get_unused_fd_flags(flags);</span><br><span class="line">	<span class="keyword">if</span> (error &lt; <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">return</span> error;</span><br><span class="line">	fd = error;</span><br><span class="line">	<span class="comment">// 创建一个匿名文件对象</span></span><br><span class="line">	file = anon_inode_getfile(name, fops, priv, flags);</span><br><span class="line">	<span class="comment">// 创建文件对象发生错误的处理</span></span><br><span class="line">	<span class="keyword">if</span> (IS_ERR(file)) &#123;</span><br><span class="line">		error = PTR_ERR(file);</span><br><span class="line">		<span class="keyword">goto</span> err_put_unused_fd;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">// 将该匿名文件对象和文件描述符关联起来</span></span><br><span class="line">	fd_install(fd, file);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> fd;</span><br><span class="line"></span><br><span class="line">err_put_unused_fd:</span><br><span class="line">	put_unused_fd(fd);</span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br><span class="line">EXPORT_SYMBOL_GPL(anon_inode_getfd);</span><br></pre></td></tr></table></figure>
+
+<p>总结epoll_create函数所做的事：调用epoll_create后，在内核中分配一个eventpoll结构和代表epoll文件的file结构，并且将这两个结构关联在一块，同时，返回一个也与file结构相关联的epoll文件描述符fd。当应用程序操作epoll时，需要传入一个epoll文件描述符fd，内核根据这个fd，找到epoll的file结构，然后通过file，获取之前epoll_create申请eventpoll结构变量，epoll相关的重要信息都存储在这个结构里面。接下来，所有epoll接口函数的操作，都是在eventpoll结构变量上进行的。</p>
+<p>所以，epoll_create的作用就是为进程在内核中建立一个从epoll文件描述符到eventpoll结构变量的通道。</p>
+<h2 id="epoll-ctl-的实现"><a href="#epoll-ctl-的实现" class="headerlink" title="epoll_ctl 的实现"></a>epoll_ctl 的实现</h2><p>这里是理解epoll的核心区域（这么久了，终于到了….）。<br>首先epoll_ctl的作用是添加、修改、删除文件的监听事件，<a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L1347">内核代码</a>：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line">SYSCALL_DEFINE4(epoll_ctl, <span class="type">int</span>, epfd, <span class="type">int</span>, op, <span class="type">int</span>, fd,</span><br><span class="line">		<span class="keyword">struct</span> epoll_event __user *, event)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error;</span><br><span class="line">	<span class="type">int</span> did_lock_epmutex = <span class="number">0</span>;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">file</span>, *<span class="title">tfile</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> *<span class="title">ep</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epitem</span> *<span class="title">epi</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span> <span class="title">epds</span>;</span></span><br><span class="line">    <span class="comment">//#define	EFAULT		14	/* Bad address */</span></span><br><span class="line">	error = -EFAULT;</span><br><span class="line">    <span class="comment">// 1. 根据操作判断是否拷贝到内核以及获取 file 对象</span></span><br><span class="line">	<span class="keyword">if</span> (ep_op_has_event(op) &amp;&amp;</span><br><span class="line">	    copy_from_user(&amp;epds, event, <span class="keyword">sizeof</span>(<span class="keyword">struct</span> epoll_event)))</span><br><span class="line">		<span class="keyword">goto</span> error_return;</span><br><span class="line">    <span class="comment">//#define	EBADF		 9	/* Bad file number */</span></span><br><span class="line">	error = -EBADF;</span><br><span class="line">	<span class="comment">// 通过文件描述符获取 file对象</span></span><br><span class="line">	file = fget(epfd);</span><br><span class="line">	<span class="keyword">if</span> (!file)</span><br><span class="line">		<span class="keyword">goto</span> error_return;</span><br><span class="line">	tfile = fget(fd);</span><br><span class="line">	<span class="keyword">if</span> (!tfile)</span><br><span class="line">		<span class="keyword">goto</span> error_fput;</span><br><span class="line">    <span class="comment">//#define	EPERM		 1	/* Operation not permitted */</span></span><br><span class="line">	error = -EPERM;</span><br><span class="line">	<span class="keyword">if</span> (!tfile-&gt;f_op || !tfile-&gt;f_op-&gt;poll)</span><br><span class="line">		<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//#define	EINVAL		22	/* Invalid argument */</span></span><br><span class="line">	error = -EINVAL;</span><br><span class="line">	<span class="keyword">if</span> (file == tfile || !is_file_epoll(file))</span><br><span class="line">		<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	ep = file-&gt;private_data;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 2. 循环引用的处理</span></span><br><span class="line">	<span class="keyword">if</span> (unlikely(is_file_epoll(tfile) &amp;&amp; op == EPOLL_CTL_ADD)) &#123;</span><br><span class="line">		mutex_lock(&amp;epmutex);</span><br><span class="line">		did_lock_epmutex = <span class="number">1</span>;</span><br><span class="line">		error = -ELOOP;</span><br><span class="line">		<span class="keyword">if</span> (ep_loop_check(ep, tfile) != <span class="number">0</span>)</span><br><span class="line">			<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	mutex_lock(&amp;ep-&gt;mtx);</span><br><span class="line">	<span class="comment">// 3. ep_find</span></span><br><span class="line">	epi = ep_find(ep, tfile, fd);</span><br><span class="line"></span><br><span class="line">	error = -EINVAL;</span><br><span class="line">	<span class="comment">// 4. </span></span><br><span class="line">	<span class="keyword">switch</span> (op) &#123;(!is_file_epoll(f.file));</span><br><span class="line">	<span class="keyword">case</span> EPOLL_CTL_ADD:</span><br><span class="line">		<span class="keyword">if</span> (!epi) &#123;</span><br><span class="line">			epds.events |= POLLERR | POLLHUP;</span><br><span class="line">			error = nsert(ep, &amp;epds, tfile, fd);</span><br><span class="line">		&#125; <span class="keyword">else</span></span><br><span class="line">			error = -EEXIST;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line">	<span class="keyword">case</span> EPOLL_CTL_DEL:</span><br><span class="line">		<span class="keyword">if</span> (epi)</span><br><span class="line">			error = ep_remove(ep, epi);</span><br><span class="line">		<span class="keyword">else</span></span><br><span class="line">			error = -ENOENT;</span><br><span class="line">		<span class="keyword">break</span>;flags</span><br><span class="line">	<span class="keyword">case</span> EPOLL_CTL_MOD:</span><br><span class="line">		<span class="keyword">if</span> (epi) &#123;</span><br><span class="line">			epds.events |= POLLERR | POLLHUP;</span><br><span class="line">			error = ep_modify(ep, epi, &amp;epds);</span><br><span class="line">		&#125; <span class="keyword">else</span></span><br><span class="line">			error = -ENOENT;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line">	&#125;</span><br><span class="line">	mutex_unlock(&amp;ep-&gt;mtx);</span><br><span class="line"></span><br><span class="line">error_tgt_fput:</span><br><span class="line">	<span class="keyword">if</span> (unlikely(did_lock_epmutex))</span><br><span class="line">		mutex_unlock(&amp;epmutex);</span><br><span class="line"></span><br><span class="line">	fput(tfile);</span><br><span class="line">error_fput:</span><br><span class="line">	fput(file);</span><br><span class="line">error_return:</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="1-根据操作判断是否拷贝到内核以及获取-file-对象"><a href="#1-根据操作判断是否拷贝到内核以及获取-file-对象" class="headerlink" title="1. 根据操作判断是否拷贝到内核以及获取 file 对象"></a>1. 根据操作判断是否拷贝到内核以及获取 file 对象</h3><p>这里的<code>op</code>是对<code>epoll</code>操作动作（添加、删除、修改），<code>ep_op_has_event(op)</code>是判断是否是删除操作，如果<code>op != EPOLL_CTL_DEL 为 true</code>时，则需要调用<code>copy_from_user()</code>将<code>event</code>事件拷贝到内核的<code>epds</code>变量中。因为只有删除操作不需要内核使用进程传入的<code>event</code>事件。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="keyword">inline</span> <span class="type">int</span> <span class="title function_">ep_op_has_event</span><span class="params">(<span class="type">int</span> op)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">return</span> op != EPOLL_CTL_DEL;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>接下来调用两次<code>fget</code>分别获取epoll文件和连接套接字文件的file结构变量。</p>
+<p>接下来就是对参数的一些检查，出现如下情况，就可以认为传入的参数有问题，直接返回出错：</p>
+<ol>
+<li>目标文件不支持poll操作(!tf.file-&gt;f_op-&gt;poll)；</li>
+<li>监听的目标文件就是epoll文件本身(f.file &#x3D;&#x3D; tf.file)；</li>
+<li>用户传入的epoll文件(epfd代表的文件）并不是一个真正的epoll的文件(!is_file_epoll(f.file));</li>
+</ol>
+<h3 id="2-循环引用的处理"><a href="#2-循环引用的处理" class="headerlink" title="2. 循环引用的处理"></a>2. 循环引用的处理</h3><p>这里会有一个问题，假设有两个epoll文件描述符 A 和 B，且A已经插入到B的文件描述符中，而某个时刻B直接或者间接插入到A中，这就形成闭环，导致事件发生时递归处理，从来形成文件的事件循环，这就是循环引用。它会导致死锁或者其他的问题。这里为了解决循环引用，代码中是下面的措施：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span> (unlikely(is_file_epoll(tfile) &amp;&amp; op == EPOLL_CTL_ADD)) &#123;</span><br><span class="line">	mutex_lock(&amp;epmutex);	</span><br><span class="line">	did_lock_epmutex = <span class="number">1</span>;</span><br><span class="line">	error = -ELOOP;</span><br><span class="line">	<span class="keyword">if</span> (ep_loop_check(ep, tfile) != <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这里先判断插入的文件描述符是否是epoll文件描述符，是否是<code>EPOLL_CTL_ADD</code>操作，条件满足时会先<code>mutex_lock(&amp;epmutex);</code>获取全局锁防止处理时发生竞争，接下来判断是否存在闭环<code>ep_loop_check(ep, tfile) != 0</code>，如果存在进入对应错误处理。</p>
+<h3 id="3-ep-find"><a href="#3-ep-find" class="headerlink" title="3. ep_find"></a>3. ep_find</h3> <!-- Try to lookup the file inside our RB tree, Since we grabbed "mtx" above, we can be sure to be able to use the item looked up by ep_find() till we release the mutex. -->
+
+<p>在ep里面，维护着一个红黑树<code>rbr</code>，每次添加注册事件时，都会申请一个epitem结构的变量表示事件的监听项，然后插入ep的红黑树里面。在epoll_ctl里面，会调用ep_find函数从ep的红黑树里面查找目标文件表示的监听项，返回的监听项可能为空。而<code>epoll_filefd</code><a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L93">结构体</a>中只有两个成员:file结构体和其对应的fd。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="type">static</span> <span class="keyword">struct</span> epitem *<span class="title function_">ep_find</span><span class="params">(<span class="keyword">struct</span> eventpoll *ep, <span class="keyword">struct</span> file *file, <span class="type">int</span> fd)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> kcmp;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">rb_node</span> *<span class="title">rbp</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epitem</span> *<span class="title">epi</span>, *<span class="title">epir</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epoll_filefd</span> <span class="title">ffd</span>;</span></span><br><span class="line">	<span class="comment">//epi 用于遍历红黑树节点，epir 用于存储最终找到的 epitem 结构体</span></span><br><span class="line">	ep_set_ffd(&amp;ffd, file, fd);</span><br><span class="line">	<span class="comment">// 遍历红黑树查找其对应的 epitem</span></span><br><span class="line">	<span class="keyword">for</span> (rbp = ep-&gt;rbr.rb_node; rbp; ) &#123;</span><br><span class="line">		epi = rb_entry(rbp, <span class="keyword">struct</span> epitem, rbn);</span><br><span class="line">		kcmp = ep_cmp_ffd(&amp;ffd, &amp;epi-&gt;ffd);</span><br><span class="line">		<span class="keyword">if</span> (kcmp &gt; <span class="number">0</span>)</span><br><span class="line">			rbp = rbp-&gt;rb_right;</span><br><span class="line">		<span class="keyword">else</span> <span class="keyword">if</span> (kcmp &lt; <span class="number">0</span>)</span><br><span class="line">			rbp = rbp-&gt;rb_left;</span><br><span class="line">		<span class="keyword">else</span> &#123;</span><br><span class="line">			epir = epi;</span><br><span class="line">			<span class="keyword">break</span>;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> epir;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="4-EPOLL-CTL-ADD情况"><a href="#4-EPOLL-CTL-ADD情况" class="headerlink" title="4. EPOLL_CTL_ADD情况"></a>4. EPOLL_CTL_ADD情况</h3><p>接下来switch这块区域的代码就是整个epoll_ctl函数的核心，对op进行switch出来的有添加(EPOLL_CTL_ADD)、删除(EPOLL_CTL_DEL)和修改(EPOLL_CTL_MOD)三种情况，这里我以添加为例讲解，其他两种情况类似，知道了如何添加监听事件，其他删除和修改监听事件都可以举一反三。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">case</span> EPOLL_CTL_ADD:</span><br><span class="line">	<span class="keyword">if</span> (!epi) &#123;</span><br><span class="line">		<span class="comment">// epds 是 epollevent</span></span><br><span class="line">		epds.events |= POLLERR | POLLHUP;</span><br><span class="line">		error = ep_insert(ep, &amp;epds, tfile, fd);</span><br><span class="line">	&#125; <span class="keyword">else</span></span><br><span class="line">		error = -EEXIST;</span><br><span class="line">	<span class="keyword">break</span>;</span><br></pre></td></tr></table></figure>
+
+<p>为目标文件添加监控事件时，首先要保证当前ep里面还没有对该目标文件进行监听，如果存在(epi不为空)，就返回-EEXIST错误。否则说明参数正常，然后先默认设置对目标文件的POLLERR和POLLHUP监听事件，然后调用ep_insert函数，将对目标文件的监听事件插入到ep维护的红黑树里面,下面是ep_insert的源码：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// fs.eventpoll.c</span></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">ep_insert</span><span class="params">(<span class="keyword">struct</span> eventpoll *ep, <span class="keyword">struct</span> epoll_event *event,</span></span><br><span class="line"><span class="params">		     <span class="keyword">struct</span> file *tfile, <span class="type">int</span> fd)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error, revents, pwake = <span class="number">0</span>;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> flags;</span><br><span class="line">	<span class="type">long</span> user_watches;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epitem</span> *<span class="title">epi</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ep_pqueue</span> <span class="title">epq</span>;</span></span><br><span class="line">	</span><br><span class="line">	<span class="comment">// 检查 epoll 实例中的监视数是否超过上限</span></span><br><span class="line">	user_watches = atomic_long_read(&amp;ep-&gt;user-&gt;epoll_watches);</span><br><span class="line">	<span class="keyword">if</span> (unlikely(user_watches &gt;= max_user_watches))</span><br><span class="line">		<span class="keyword">return</span> -ENOSPC;</span><br><span class="line">	</span><br><span class="line">	<span class="comment">// 分配 epitem 项结构体</span></span><br><span class="line">	<span class="keyword">if</span> (!(epi = kmem_cache_alloc(epi_cache, GFP_KERNEL)))</span><br><span class="line">		<span class="keyword">return</span> -ENOMEM;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// epi 初始化</span></span><br><span class="line">	INIT_LIST_HEAD(&amp;epi-&gt;rdllink);</span><br><span class="line">	INIT_LIST_HEAD(&amp;epi-&gt;fllink);</span><br><span class="line">	INIT_LIST_HEAD(&amp;epi-&gt;pwqlist);</span><br><span class="line">	epi-&gt;ep = ep;</span><br><span class="line">	ep_set_ffd(&amp;epi-&gt;ffd, tfile, fd);</span><br><span class="line">	epi-&gt;event = *event;</span><br><span class="line">	epi-&gt;nwait = <span class="number">0</span>;</span><br><span class="line">	epi-&gt;next = EP_UNACTIVE_PTR;</span><br><span class="line"></span><br><span class="line">	epq.epi = epi;</span><br><span class="line">	<span class="comment">// 初始化回调函数</span></span><br><span class="line">	init_poll_funcptr(&amp;epq.pt, ep_ptable_queue_proc);</span><br><span class="line"></span><br><span class="line">	<span class="comment">//  将回调函数 ep_ptable_queue_proc 与 tfile 文件关联起来，以及获取当前文件的事件位</span></span><br><span class="line">	revents = tfile-&gt;f_op-&gt;poll(tfile, &amp;epq.pt);</span><br><span class="line"></span><br><span class="line">	error = -ENOMEM;</span><br><span class="line">	<span class="keyword">if</span> (epi-&gt;nwait &lt; <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">goto</span> error_unregister;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 调用list_add_tail_rcu将当前监听项添加到目标文件的f_ep_links链表里面</span></span><br><span class="line">	<span class="comment">// 该链表是目标文件的epoll钩子链表，所有对该目标文件进行监听的监听项都会加入到该链表里面。</span></span><br><span class="line">	spin_lock(&amp;tfile-&gt;f_lock);</span><br><span class="line">	list_add_tail(&amp;epi-&gt;fllink, &amp;tfile-&gt;f_ep_links);</span><br><span class="line">	spin_unlock(&amp;tfile-&gt;f_lock);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	<span class="comment">// 将epi监听项添加到ep维护的红黑树里面</span></span><br><span class="line">	ep_rbtree_insert(ep, epi);</span><br><span class="line"></span><br><span class="line">	spin_lock_irqsave(&amp;ep-&gt;lock, flags);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> ((revents &amp; event-&gt;events) &amp;&amp; !ep_is_linked(&amp;epi-&gt;rdllink)) &#123;</span><br><span class="line">		list_add_tail(&amp;epi-&gt;rdllink, &amp;ep-&gt;rdllist);</span><br><span class="line"></span><br><span class="line">		<span class="keyword">if</span> (waitqueue_active(&amp;ep-&gt;wq))</span><br><span class="line">			wake_up_locked(&amp;ep-&gt;wq);</span><br><span class="line">		<span class="keyword">if</span> (waitqueue_active(&amp;ep-&gt;poll_wait))</span><br><span class="line">			pwake++;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	spin_unlock_irqrestore(&amp;ep-&gt;lock, flags);</span><br><span class="line"></span><br><span class="line">	atomic_long_inc(&amp;ep-&gt;user-&gt;epoll_watches);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (pwake)</span><br><span class="line">		ep_poll_safewake(&amp;ep-&gt;poll_wait);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">error_unregister:</span><br><span class="line">	ep_unregister_pollwait(ep, epi);</span><br><span class="line"></span><br><span class="line">	spin_lock_irqsave(&amp;ep-&gt;lock, flags);</span><br><span class="line">	<span class="keyword">if</span> (ep_is_linked(&amp;epi-&gt;rdllink))</span><br><span class="line">		list_del_init(&amp;epi-&gt;rdllink);</span><br><span class="line">	spin_unlock_irqrestore(&amp;ep-&gt;lock, flags);</span><br><span class="line"></span><br><span class="line">	kmem_cache_free(epi_cache, epi);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>在调用epoll_ctl时，可能会产生相关进程需要监听的事件，如果有监听的事件产生，(revents &amp; event-&gt;events 为 true)，并且目标文件相关的监听项没有链接到ep的准备链表rdlist里面的话，就将该监听项添加到ep的rdlist准备链表里面，rdlist链接的是该epoll描述符监听的所有已经就绪的目标文件的监听项。并且，如果有任务在等待产生事件时，就调用wake_up_locked函数唤醒所有正在等待的任务，处理相应的事件。当进程调用epoll_wait时，该进程就出现在ep的wq等待队列里面。</p>
+<hr>
+<p><a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/rcupdate.h#L60">回调函数</a></p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;linux/rcupdate.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">my_data</span> &#123;</span></span><br><span class="line">    <span class="comment">// 数据结构的定义</span></span><br><span class="line">    <span class="type">int</span> value;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span> <span class="title">rcu</span>;</span>  <span class="comment">// 包含在数据结构中的 struct rcu_head</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 初始化数据结构并将其插入 RCU 队列</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">enqueue_for_removal</span><span class="params">(<span class="keyword">struct</span> my_data *data)</span> &#123;</span><br><span class="line">    call_rcu(&amp;data-&gt;rcu, my_data_free_callback);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 实际的释放回调函数</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">my_data_free_callback</span><span class="params">(<span class="keyword">struct</span> rcu_head *head)</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">my_data</span> *<span class="title">data</span> =</span> container_of(head, <span class="keyword">struct</span> my_data, rcu);</span><br><span class="line">    kfree(data);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p><a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/ipv4/tcp_input.c#L5401">sk_data_ready</a><br><a href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/core/sock.c#L1904">sock_def_readable</a></p>
+]]></content>
+      <tags>
+        <tag>epoll</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Hello World</title>
+    <url>/2023/10/02/hello-world/</url>
+    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.<span id="more"></span></p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+]]></content>
+      <tags>
+        <tag>hexo</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>中位数贪心</title>
+    <url>/2023/12/18/%E4%B8%AD%E4%BD%8D%E6%95%B0%E8%B4%AA%E5%BF%83/</url>
+    <content><![CDATA[<p>今天刷力扣第376周赛，后三道题全是<code>中位数贪心</code>，之前从来没做过这种类型的题目，记录一下学习博客。<br>这里推荐<a href="https://www.bilibili.com/video/BV1994y1A7oo/?spm_id_from=333.337.search-card.all.click">灵神</a>的视频讲解。</p>
+<p>一个很经典的问题：</p>
+<p>一个有序数组，寻找一个数字，使得所有数到达这个数的距离（数值差）最短。</p>
+<p>举个极端的例子：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">1 1 1 1 996</span><br></pre></td></tr></table></figure>
+
+<p>这个数字取数组的平均值:200，距离和是: 199 * 3 + (996 - 250) &#x3D; 1343<br>这个数字取数组的中位数:1,距离和是：996 - 1</p>
+<p>相较之下取中位数比平均数更短，但是为了严谨，还是简单证明一下：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">a0 a1 a2 a3 ... an</span><br></pre></td></tr></table></figure>
+<p>1 3 5</p>
+<p>如果取的数字在a0的左侧，那么如果这个数字加一依旧在a0的左侧，那么显而易见：总距离和会减少 n ；如果在an的右侧，也是同理。<br>如果取得数字在a0到a1之间如果该数字加一依旧在a0到a1之间，那么总距离就会减少 n - 1 - 1。如果是右侧(an-1 到 an之间)也是同理。<br>以此类推，到达中位数的时候就是最短距离。（平均数也可以用类似的方法推导）。<a href="https://www.cnblogs.com/xidian-mao/p/7819928.html">简单证明</a>。</p>
+<p>难绷的是我想到了思路，但是代码一直写不出来，还是太菜了。最终代码还是抄的灵神代码（不得不说，写的比我那上不了台面的代码优雅的多）。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="built_in">vector</span>&lt;<span class="type">int</span>&gt; palin;</span><br><span class="line"><span class="keyword">auto</span> init = [] &#123;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> base = <span class="number">1</span>;base &lt;= <span class="number">10000</span>;base*=<span class="number">10</span>) &#123;</span><br><span class="line">        <span class="comment">// 奇数</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">            <span class="type">int</span> num = i;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> m = i / <span class="number">10</span>;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            palin.push_back(num);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 偶数</span></span><br><span class="line">       <span class="keyword">if</span>(base &lt;= <span class="number">1000</span>)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">                <span class="type">int</span> num = i;</span><br><span class="line">                <span class="keyword">for</span>(<span class="type">int</span> m = i;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                    num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                palin.push_back(num);</span><br><span class="line">            &#125;</span><br><span class="line">       &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    palin.push_back(<span class="number">1&#x27;000&#x27;000&#x27;001</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;();</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> &#123;</span></span><br><span class="line">public:</span><br><span class="line">    <span class="type">long</span> <span class="type">long</span> <span class="title function_">minimumCost</span><span class="params">(<span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;&amp; nums)</span> &#123;</span><br><span class="line">        sort(nums.begin(),nums.end());</span><br><span class="line">        <span class="type">int</span> n = nums.size();</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">auto</span> distance = [&amp;](<span class="type">int</span> i) -&gt; <span class="type">long</span> <span class="type">long</span> &#123;</span><br><span class="line">            <span class="type">long</span> <span class="type">long</span> sum = <span class="number">0</span>;</span><br><span class="line">            <span class="type">int</span> target = palin[i];</span><br><span class="line">            <span class="keyword">for</span>(<span class="keyword">auto</span>&amp; e : nums) &#123;</span><br><span class="line">                sum += <span class="built_in">abs</span>(e - target);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> sum;</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        <span class="type">int</span> i = lower_bound(palin.begin(),palin.end(),nums[(n<span class="number">-1</span>)/<span class="number">2</span>]) - palin.begin();</span><br><span class="line">        <span class="keyword">if</span>(palin[i] &lt;= nums[n / <span class="number">2</span>])  <span class="keyword">return</span> distance(i);</span><br><span class="line">        <span class="keyword">return</span> min(distance(i),distance(i - <span class="number">1</span>));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>]]></content>
+      <tags>
+        <tag>算法</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>中断和动态时钟显示</title>
+    <url>/2023/10/18/%E4%B8%AD%E6%96%AD%E5%92%8C%E5%8A%A8%E6%80%81%E6%97%B6%E9%92%9F%E6%98%BE%E7%A4%BA/</url>
+    <content><![CDATA[<h3 id="外部硬件中断"><a href="#外部硬件中断" class="headerlink" title="外部硬件中断"></a>外部硬件中断</h3><p>外部硬件中断就是从处理器外面来的中断信号，优先级很高。</p>
+<p>它的实现是通过两个信号线引入处理器内部的，分别叫<code>NMI</code>和<code>INTR</code>。</p>
+<span id="more"></span>
+
+
+<h4 id="非屏蔽中断（Non-Maskable-Interrupt-NMI）"><a href="#非屏蔽中断（Non-Maskable-Interrupt-NMI）" class="headerlink" title="非屏蔽中断（Non Maskable Interrupt,NMI）"></a>非屏蔽中断（Non Maskable Interrupt,NMI）</h4><p>需要两条线的原因是不一定每一个中断的优先级都需要立刻处理。当涉及到非屏蔽中断，通常是一些紧急且必须立即处理的硬件事件。</p>
+<p><strong>硬件中断的优先级管理</strong>：某些系统可能会使用外部硬件中断来处理中断请求的优先级。这意味着当多个中断同时发生时，不是所有中断都需要立即处理。处理器可以为不同的中断信号分配不同的优先级，从而决定哪些中断需要立即处理，而哪些可以等待。</p>
+<p>需要立即处理的：</p>
+<ul>
+<li>电池电量低，系统会发出一个中断告诉处理器快没电了。</li>
+<li>内存访问电路有校验错误（读取错误）。</li>
+</ul>
+<p>不那么着急处理的：</p>
+<p>举个例子，一个嵌入式系统可能有多个外部硬件设备连接到处理器，包括键盘、鼠标和网络适配器。如果用户同时按下键盘上的按键和鼠标点击，系统可以根据设定的中断优先级来决定哪个中断首先得到处理。通常情况下，键盘中断可能具有较高的优先级，因为用户通常期望键盘响应更快，而鼠标中断则有较低的优先级，因为它不太紧急。</p>
+<p>中断信号的来教叫做 <strong>中断源</strong>。传统的兼容模式下，NMI的中断源通过一个<strong>与非门</strong>连接到处理器，处理器的NMI引脚是<strong>高电平有效</strong>，中断信号是<strong>低电平</strong>有效,也就是NMI引脚是低电平则没有中断。</p>
+<p>即使NMI与非门的输出为高时，也不能立刻被识别，还需要<strong>至少</strong>维持4个以上的时钟周期才算有效。</p>
+<p>处理器还应当知道发生了什么事，以便于采用适当的处理措施。每个类型的中断都被统一编号，被称为中断类型号、中断向量或者中断号。而有些比较严重的事件就在实模式下被赋予了统一的中断号 2 ，一旦发生 2 号中断，处理器和软件系统通常会放弃继续正常工作的念头，也不会试图纠正已经发生的问题和错误。</p>
+<h4 id="可屏蔽中断-Interrupt-Request-INTR-1-7-4-9-2-5"><a href="#可屏蔽中断-Interrupt-Request-INTR-1-7-4-9-2-5" class="headerlink" title="可屏蔽中断(Interrupt Request,INTR)1,7,4,9,2,5"></a>可屏蔽中断(Interrupt Request,INTR)1,7,4,9,2,5</h4><p>由于可能有多台设备同时发送中断请求，但是处理器每次只能处理一个中断，这就需要一个中间层进行仲裁，优先处理优先级更高的。个人计算机中使用最多的就是<code>8259芯片</code>。Intel处理器允许256个中断，8259负责15个不固定的中断号，8个中断输入引脚。引脚的<code>IR0</code>优先级向<code>IR7</code>递减，从片是级联在主片的<code>IR2</code>引脚。</p>
+<p>个人计算机中有两块<code>8259芯片</code>，并且两块的关系是级联：主片的<code>INT输出</code>直接送到处理器<code>INTR</code>引脚；从片的<code>INT输出</code>送到第一块的引脚2上，一共提供15个中断信号。</p>
+<ul>
+<li>主片的引脚 0 接的是系统定时器&#x2F;定时器芯片，主片的端口号是<code>0x20</code>和<code>0x21</code></li>
+<li>从片的引脚 0 接的是实时时钟芯片(RTC)，从片的端口号是<code>0xa0</code>和<code>0xa1</code></li>
+</ul>
+<p>8259内部有中断屏蔽寄存器（IMR）8位寄SPSCQueue *SPSCQueueInit(int capacity);<br>void SPSCQueuePush(SPSCQueue *queue, void *s);<br>void *SPSCQueuePop(SPSCQueue *queue);<br>void SPSCQueueDestory(SPSCQueue *);<br>即使中断从8529发送出去，最终解释权也归处理器。处理器内部的标志寄存器有个<code>IF</code>标志位（中断标志）。当<code>IF</code>为0,中断信号被忽略。</p>
+<p>对于IF标志位的处理有两条指令:<code>cli</code>（Clear Interrupt Flag）和<code>sti</code>(SeT Interrupt flag)。</p>
+<p><strong>中断嵌套</strong>：当一个中断事件正在处理时，如果来了优先级更高的中断事件，允许暂时中止当前的中断事件，先为优先级较高的中断事件服务。</p>
+<h4 id="实模式下的中断向量表"><a href="#实模式下的中断向量表" class="headerlink" title="实模式下的中断向量表"></a>实模式下的中断向量表</h4><p>中断处理实际上就是处理器执行一段与该中断有关的指令。因为可以识别256个中断，理论上就需要256段程序，在实模式下，处理器要求将它们的入口点集中存放在内存中从地址<code>0x00000</code>到<code>0x003ff</code>，共<code>1kb</code>的空间内，这就是中断向量表（Interrupt Vector Table,IVT）。</p>
+<p>每个中断在中断向量表中占2个字，分别是中断处理程序的偏移地址和段地址。</p>
+<p>中断发生时，处理器执行完当前指令后会立刻为硬件服务，会先响应中断，告诉处理器处理该中断，然后向8259芯片所要中断号。</p>
+<p>处理器拿到中断号会干下面的事情：</p>
+<ol>
+<li>保护断点的现场。将标志寄存器FLAGS压栈，清除其<code>IF</code>位和<code>TF</code>位（陷阱标志）。然后将当前的<code>CS</code>和<code>IP</code>压栈。(清除<code>IF</code>是因为在此期间不再响应硬件中断，如果希望更高优先级的中断嵌套，可以编写程序时，使用<code>sti</code>开放中断)</li>
+<li>执行中断程序。拿到中断号，将其乘4,得到其在中断向量表的偏移地址。从表中取出来对应段地址和偏移地址传入<code>CS</code>和<code>IP</code>。</li>
+<li>返回到断点继续执行。所有中断处理程序的最后一条必须是中断返回指令<code>iret</code>。依次恢复<code>IP</code>，<code>CS</code>，<code>FLAGS</code>的原始数值。</li>
+</ol>
+<p>而<code>NMI</code>不会从外部获得中断号，自动生成中断号码 2,其他过程相同。</p>
+<h4 id="实时时钟、CMOS-RAM-和-BCD编码"><a href="#实时时钟、CMOS-RAM-和-BCD编码" class="headerlink" title="实时时钟、CMOS RAM 和 BCD编码"></a>实时时钟、CMOS RAM 和 BCD编码</h4><p>计算机为什么能精准显示日期和时间？在外围设备控制器芯片<code>ICH</code>内部，集成了实时时钟电路（RTC）和两小块由互补金属氧化物材料组成的静态存储器（CMOS RAM）。实时时钟电路负责计时，日期和时间存储在静态存储器中。存储方式通常是二进制编码的十进制数（BCD）。  </p>
+<p>实时时钟是全天候跳动的，即使断电。因为主板上有个小电池供电。</p>
+<p>日期和时间信息存储在<code>CMOS RAM</code>中，通常有128字节，日期和时间信息只占了一小部分容量，其他空间用于保存整机的配置信息（硬件类型、工作参数、开机密码、辅助设备启动顺序）</p>
+<p><code>CMOS RAM</code>的访问需要通过两个端口：<code>0x70</code>或者<code>0x74</code>是索引端口，用来指定<code>CMOS RAM</code>内的单元；<code>0x71</code>或者<code>0x75</code>是数据端口，用来读写对应单元内的内容。</p>
+<table>
+<thead>
+<tr>
+<th>偏移地址</th>
+<th>内容</th>
+<th>偏移地址</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0x00</td>
+<td>秒</td>
+<td>0x01</td>
+<td>闹钟秒</td>
+</tr>
+<tr>
+<td>0x02</td>
+<td>分</td>
+<td>0x03</td>
+<td>闹钟分</td>
+</tr>
+<tr>
+<td>0x04</td>
+<td>时</td>
+<td>0x05</td>
+<td>闹钟时</td>
+</tr>
+<tr>
+<td>0x06</td>
+<td>星期</td>
+<td>0x07</td>
+<td>日</td>
+</tr>
+<tr>
+<td>0x08</td>
+<td>月</td>
+<td>0x09</td>
+<td>年</td>
+</tr>
+<tr>
+<td>0x0A</td>
+<td>寄存器A</td>
+<td>0x0B</td>
+<td>寄存器B</td>
+</tr>
+<tr>
+<td>0x0C</td>
+<td>寄存器C</td>
+<td>0x0D</td>
+<td>寄存器D</td>
+</tr>
+</tbody></table>
+<p>下面的例子是用来获取当时是星期几:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov al,0x06</span><br><span class="line">out 0x70,al</span><br><span class="line">in al,0x71</span><br></pre></td></tr></table></figure>
+<ol>
+<li><p><code>out 0x70, al</code>: 这是一个输出指令，用于将AL寄存器中的值（在这里是0x06）写入到I&#x2F;O端口0x70。在x86架构中，0x70端口通常用于控制实时时钟芯片的寄存器。这个操作可能用于设置实时时钟的某些配置，例如将其配置为读取或写入日期和时间信息。</p>
+</li>
+<li><p><code>in al, 0x71</code>: 这是一个输入指令，用于从I&#x2F;O端口0x71读取数据，并将读取的数据存储到AL寄存器中。在这个上下文中，0x71端口通常用于读取实时时钟的状态或数据，例如当前的时间信息。</p>
+</li>
+</ol>
+<p>端口的最高位是控制<code>NMI</code>中断的开关。为0时，允许<code>NMI</code>中断到达处理器；为1时，阻断所有<code>NMI</code>信号，它<strong>不是</strong>中断信号，但是能控制与非门的输出。其他七个比特实际上用于指定<code>CMOS RAM</code>单元的索引号。</p>
+<h4 id="初始化8259、RTC和中断向量表"><a href="#初始化8259、RTC和中断向量表" class="headerlink" title="初始化8259、RTC和中断向量表"></a>初始化8259、RTC和中断向量表</h4><p>寄存器A：寄存器A通常用于配置RTC的中断频率。通过设置寄存器A的值，你可以定义RTC中断的触发频率，例如每秒触发一次。这通常涉及到配置寄存器A的低4位（Rate Selector）。</p>
+<p>寄存器B：寄存器B通常包含一些控制中断的位。它允许你启用或禁用RTC中断，并可能还有其他控制位，例如24小时模式、BCD码格式等。</p>
+<p>寄存器C：寄存器C用于指示中断的发生。当RTC触发中断时，寄存器C的某些位会被设置，以告知系统发生了中断。</p>
+<p>寄存器D：寄存器D通常包含一些额外的控制位，可能与其他RTC功能有关。</p>
+]]></content>
+      <tags>
+        <tag>x86汇编</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>函数声明</title>
+    <url>/2023/10/11/%E5%87%BD%E6%95%B0%E5%A3%B0%E6%98%8E/</url>
+    <content><![CDATA[<h3 id="正确理解函数声明"><a href="#正确理解函数声明" class="headerlink" title="正确理解函数声明"></a>正确理解函数声明</h3><p>看书的时候看到一个很抽象的语句：<br><code>(*(void(*)())0)();</code><br>想必每个C程序员看到这条语句都会觉得难绷。这个表达式实际上是在尝试调用位于地址0处的函数指针。在大多数操作系统中，访问地址0通常是非法的，因为它可能导致程序崩溃或产生未定义的行为。这种操作在一些特殊的底层编程场景中可能有用，但在通常的应用程序中应该避免使用，因为它不安全且不可移植。</p>
+<span id="more"></span>
+
+
+<p>请各位牢记一条十分简单的规则：<strong>按照使用的方式来声明。</strong></p>
+<h4 id="声明符与表达式"><a href="#声明符与表达式" class="headerlink" title="声明符与表达式"></a>声明符与表达式</h4><p>声明符（Declaration Specifier）和表达式（Expression）是编程中的两个不同概念，它们有以下异同点：</p>
+<p><strong>相同点</strong>：</p>
+<ol>
+<li><p><strong>语法元素</strong>：声明符和表达式都是编程语言的语法元素，它们用于构建和操作程序中的数据和操作。</p>
+</li>
+<li><p><strong>用途</strong>：声明符用于声明（或定义）变量、函数、类型或其他标识符，以便程序正确识别和使用这些标识符。表达式用于表示和计算值，它可以包括操作数和操作符，用于执行特定的计算操作。</p>
+</li>
+</ol>
+<p><strong>不同点</strong>：</p>
+<ol>
+<li><p><strong>含义和作用</strong>：</p>
+<ul>
+<li><strong>声明符</strong> 用于描述标识符的性质和类型，但不执行计算或操作。它告诉编译器如何分配内存和如何解释标识符的内容。</li>
+<li><strong>表达式</strong> 用于表示和计算值，执行特定的计算操作，返回一个结果。表达式可以包括常量、变量、运算符和函数调用等，用于生成新的值。</li>
+</ul>
+</li>
+<li><p><strong>例子</strong>：</p>
+<ul>
+<li>声明符示例：<code>int x;</code>（声明一个整数变量x）、<code>void myFunction();</code>（声明一个没有返回值的函数myFunction）。</li>
+<li>表达式示例：<code>x + 5</code>（计算x与5的和，返回一个值）、<code>myFunction()</code>（调用函数myFunction，返回其结果）。</li>
+</ul>
+</li>
+<li><p><strong>上下文</strong>：</p>
+<ul>
+<li><strong>声明符</strong> 通常出现在变量、函数、类型或其他标识符的声明语句中，例如在变量声明、函数原型、结构体定义等地方。</li>
+<li><strong>表达式</strong> 通常出现在赋值语句、算术运算、逻辑运算、函数调用等地方，用于执行操作和计算值。</li>
+</ul>
+</li>
+</ol>
+<p>总之，声明符用于描述标识符的性质和类型，而表达式用于表示和计算值。它们在编程中扮演不同的角色，但都是构建程序逻辑的重要组成部分。</p>
+<h4 id="声明"><a href="#声明" class="headerlink" title="声明"></a>声明</h4><p>任何的C变量的声明都由两部分组成：类型，声明符。最简单的声明符就是单个变量，比如：</p>
+<p><code>int tmp;</code></p>
+<p>这个声明的含义是：当对其求值时，tmp的类型是<code>int</code>。<br>当然也可以这样写：</p>
+<p><code>int ((tmp));</code></p>
+<p>这个声明的含义是：当对其求值时，((tmp))的类型是<code>int</code>型，因此也可以推出来tmp的类型是<code>int</code>。<br>同理的逻辑也适用于函数和指针的声明：</p>
+<p><code>double func();</code></p>
+<p>这个声明的含义是：<code>func()</code>求值的结果是<code>double</code>类型。也就是说，<code>func</code>是一个返回值为<code>double</code>类型的函数。</p>
+<p><code>int* p;</code></p>
+<p>这个声明的含义是：<code>*p</code>是一个<code>int</code>型数据。也就是说，<code>p</code>是一个指向<code>int</code>型数据的指针。</p>
+<p>将上面的声明组合一下：</p>
+<p><code>double *func2(),(*func3)();</code></p>
+<p>表示<code>*func2()</code>和<code>(*func3())</code>都是浮点类型的声明符。因为<code>()</code>优先级高于<code>*</code>，可以得出：<br><code>func2</code>是一个函数，该函数的返回值是指向<code>double</code>类型数据的指针。<br><code>func3</code>是一个函数指针，其指向的函数的返回值类型是<code>double</code>。</p>
+<h4 id="类型转换符"><a href="#类型转换符" class="headerlink" title="类型转换符"></a>类型转换符</h4><p>类型转换符是一种在编程语言中用于改变一个值的数据类型的操作符或关键字。类型转换符允许程序员显式地指定将一个数据类型转换为另一个数据类型的方式。这种操作通常称为类型转换或强制类型转换。在理解了上面的知识点后，如果得到一个声明好的、给定类型的变量，得到它的类型转换符也就不是一件难事。例如：</p>
+<p><code>float (*tmp)();</code></p>
+<p>表示<code>tmp</code>是一个指向返回值为<code>float</code>类型的函数的指针，那么：</p>
+<p><code>float (*)()</code></p>
+<p>也就表示为一个“一个指向返回值为<code>float</code>类型的函数的指针”的类型转换符。</p>
+<p>可以看下面代码再练习练习：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">myFunction</span><span class="params">(<span class="type">char</span> *str, <span class="type">int</span> num)</span> &#123;</span><br><span class="line">    <span class="comment">// 函数实现</span></span><br><span class="line">    <span class="keyword">return</span> num * <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 声明一个函数指针，并初始化为指向myFunction的指针</span></span><br><span class="line">    <span class="type">int</span> (*h)(<span class="type">char</span> *, <span class="type">int</span>);</span><br><span class="line">    <span class="comment">// 这里的myFunction的类型就是 int (*)(char *, int),为了便于理解我就全部写出来了</span></span><br><span class="line">    h = (<span class="type">int</span> (*)(<span class="type">char</span> *, <span class="type">int</span>))myFunction;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 现在可以使用h来调用函数</span></span><br><span class="line">    <span class="type">int</span> result = h(<span class="string">&quot;Hello&quot;</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, result);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>注意：</p>
+<p><code>(*fp)();</code></p>
+<p>fp是一个<strong>函数指针</strong>，那么<code>*fp</code>就是该指针指向的函数，所以<code>(*fp)()</code>就是调用这个函数的方式。但是，ANSI C 标准允许程序员将上式子简写成<code>fp()</code>，这只是一种<strong>简写</strong>。</p>
+<p>看的仔细的读者就会发现，我上面代码调用函数也使用了简写。因此我上面的代码中：<code>int result = h(&quot;Hello&quot;, 1);</code>实际上是<code>int result = (*h)(&quot;Hello&quot;, 1);</code>。</p>
+<h4 id="解答"><a href="#解答" class="headerlink" title="解答"></a>解答</h4><p><code>(*(void(*)())0)();</code>被设计的目的是为了在计算机启动的时候，硬件将调用首地址为0位置的子例程。</p>
+<p>你可能会想，为什么不直接：</p>
+<p><code>(* 0)()</code></p>
+<p>可惜编译器是笨重的。因为运算符<code>*</code>必须要一个指针来进行解引用。而且这个指针还应该是一个函数指针，这样经过运算符<code>*</code>作用后的结果才能作为函数被调用。因此，上式子对<code>0</code>要进行强制类型转换为一个“指向返回值为void类型的函数的指针”。因此就有了下式：</p>
+<p><code>(*(void(*)())0)();</code>,让我解释一下这个表达式的各个部分：</p>
+<ol>
+<li><p><code>void(*)()</code>：这部分表示一个函数指针类型，它指向一个没有参数并且没有返回值的函数。这是一个函数指针类型的定义，但没有指向任何有效函数。</p>
+</li>
+<li><p><code>0</code>：这是一个空指针，它不指向任何内存地址。</p>
+</li>
+<li><p><code>(*(void(*)())0)</code>：这部分将空指针转换为一个函数指针，然后尝试通过解引用这个函数指针来调用一个函数。</p>
+</li>
+<li><p>最后的 <code>();</code> 尝试调用解引用的函数指针，但由于函数指针不指向有效函数，这会导致未定义行为，通常会导致程序崩溃或其他不可预测的结果。</p>
+</li>
+</ol>
+]]></content>
+      <tags>
+        <tag>C语言</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>加载程序（器）的工作流程</title>
+    <url>/2023/10/14/%E5%8A%A0%E8%BD%BD%E7%A8%8B%E5%BA%8F%EF%BC%88%E5%99%A8%EF%BC%89%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%A8%8B/</url>
+    <content><![CDATA[<h3 id="用户程序头部"><a href="#用户程序头部" class="headerlink" title="用户程序头部"></a>用户程序头部</h3><p>我们知道编译器编译的用户程序和加载器实际上是在不同时间、不同地方、不同的人开发的。因此，双方都不了解对象的结构和功能，此时就需要一个结构来传达必要的信息。在看下面的文章时候最好能完全掌握<a href="https://zhendewokusi.github.io/2023/10/14/%E5%9C%B0%E5%9D%80%E3%80%81section%E3%80%81vstart/#more">地址、section、vstart</a>的内容。</p>
+<span id="more"></span>
+
+<p>加载器必须了解一些如何加载用户程序的必要信息。这通常是加载器的编写者和用户程序的编写者互相协商决定的。经验表明，把这个约定的地方放在用户程序的开头，对双方，特别是加载器来说比较方便，这就是用户程序头部。</p>
+<p>而用户程序头部是一个段，且是第一个被定义的段，且总是位于整个源程序的开头。</p>
+<h4 id="用户程序头部必须包含的信息"><a href="#用户程序头部必须包含的信息" class="headerlink" title="用户程序头部必须包含的信息"></a>用户程序头部必须包含的信息</h4><ol>
+<li><p>用户程序的尺寸（单位是字节）。加载器需要根据尺寸来决定读取多少个逻辑扇区。</p>
+</li>
+<li><p>用户程序的入口点，包含段地址和偏移地址。加载器并不清楚用户程序的分段情况，更不知道第一条要执行的指令在用户程序中的哪个位置。因此，必须在头部中包含第一条指令的段地址和偏移地址，也就是用户程序的入口点。你可能会想，那你上一篇文章也没有这样做呀。甚至没有用户程序头部。是这样的，很多程序可能会有多个代码段，因此需要明确指出用户程序刚开始运行的地址，我的上一篇的例子还是过于理想化了。</p>
+</li>
+<li><p>段重定位表。还是刚刚说的，一个程序可能会有多个代码段和数据段。这些段如何用归用户程序管，但是程序加载在内存中时地址需要重新确定。</p>
+</li>
+</ol>
+<p>实际上的用户程序头部还包含：校验和信息、外部依赖项、内存布局、硬件要求等等。</p>
+<h4 id="实例"><a href="#实例" class="headerlink" title="实例"></a>实例</h4><p>该例子是&lt;&lt;x86汇编 从实模式到保护模式&gt;&gt;中第八章的示例代码。如果需要更多代码，可以<a href="https://github.com/zhendewokusi/codeOfAssembly.git">查看</a>。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">SECTION header vstart=0                     ;定义用户程序头部段 </span><br><span class="line">    program_length  dd program_end          ;程序总长度[0x00]</span><br><span class="line">    </span><br><span class="line">    ;用户程序入口点</span><br><span class="line">    code_entry      dw start                ;偏移地址[0x04]</span><br><span class="line">                    dd section.code_1.start ;段地址[0x06] </span><br><span class="line">    </span><br><span class="line">    realloc_tbl_len dw (header_end-code_1_segment)/4</span><br><span class="line">                                            ;段重定位表项个数[0x0a]</span><br><span class="line">    </span><br><span class="line">    ;段重定位表           </span><br><span class="line">    code_1_segment  dd section.code_1.start ;[0x0c]</span><br><span class="line">    code_2_segment  dd section.code_2.start ;[0x10]</span><br><span class="line">    data_1_segment  dd section.data_1.start ;[0x14]</span><br><span class="line">    data_2_segment  dd section.data_2.start ;[0x18]</span><br><span class="line">    stack_segment   dd section.stack.start  ;[0x1c]</span><br><span class="line">    </span><br><span class="line">    header_end:                </span><br><span class="line">    </span><br></pre></td></tr></table></figure>
+<h3 id="加载器的工作流程"><a href="#加载器的工作流程" class="headerlink" title="加载器的工作流程"></a>加载器的工作流程</h3><h4 id="初始化和决定加载位置"><a href="#初始化和决定加载位置" class="headerlink" title="初始化和决定加载位置"></a>初始化和决定加载位置</h4><p>加载器要加载一个用户程序，需要做两件事情：内存哪儿是空闲的（从哪个物理内存地址开始加载用户程序），用户程序在硬盘哪儿呢？起始逻辑扇区号是什么？</p>
+<p>我们来看一看<a href="https://github.com/zhendewokusi/codeOfAssembly/blob/master/booktool/c08/c08_mbr.asm"><strong>mbr</strong></a>的具体细节。来看第六行：<code>app_lba_start equ 100</code>。这里的<code>app_lba_start</code>就是指的就是用户程序起始逻辑扇区号号。你可能会想，我为啥要多此一举，直接传立即数不好吗？有编程语言素养的人一定会理解我说的：程序中尽可能避免 <code>magic number</code> ,它的不好之处我也就不赘述。使用<code>equal</code>也不会占用任何汇编地址，也不会再运行的时候占用任何内存位置。</p>
+<p>加载用户程序需要一个确定的内存物理地址，<code>phy_base dd 0x10000</code>示例代码将其初始化为0x10000，你当然可以改成其他地址，只要它是空闲的，且必须16字节对齐。一般情况下，加载器及其栈的地址范围在0xA0000以上，在BIOS和外围设备的范围。</p>
+<h4 id="准备加载用户程序"><a href="#准备加载用户程序" class="headerlink" title="准备加载用户程序"></a>准备加载用户程序</h4><p>我们将主引导扇区程序定义为一个段。比如示例代码中：<code>SECTION mbr align=16 vstart=0x7c00</code>,这句话是必要的，因为需要设置<code>vstart</code>。</p>
+<p>由于<code>phy_base</code>是一个32位的数，且是低端序列存放的，要先通过物理起始地址计算用于加载用户程序的逻辑段地址，所以是：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">    mov ax,[cs:phy_base] </span><br><span class="line">    mov dx,[cs:phy_base+0x02]</span><br><span class="line">    mov bx,16        </span><br><span class="line">    div bx            </span><br><span class="line">    mov ds,ax    致高位，低地址存低位，且`phy_base`中是`0x10000`，则这两条指令过后:AX寄存器的数值是`0x00`，DX寄存器中是`0X01`。</span><br><span class="line">之后将物理地址变成16位的段地址，并且传送给`DS`和`ES`寄存器。因为前面提到过的，它必须16字节对齐，因此直接将物理地址右移4位就好了。`AX`中存储的是除的商，余数为0没有意义。</span><br><span class="line"></span><br><span class="line">#### 外围设备及其接口</span><br><span class="line"></span><br><span class="line">接下来加载器就需要访问其他的硬件（eg:硬盘、鼠标、键盘）。因为和计算机主机连接的设备都需要和处理器打交道，就需要一种机制来统一。这里的外接设备都叫做**外围设备**。外围设备分为两种，一种是输入设备，比如键盘、鼠标；另一种是输出设备，比如显示器、打印机。</span><br><span class="line"></span><br><span class="line">而每种设备的工作方式是不一样的。比如扬声器需要的是模拟信号；键盘传输的是**ASCII码**。不同设备传输的信号不一样，插头插孔都不一样、连线的数量也不一样。所以就有了*信号转换器*和*变速齿轮*，这就是**I/O接口**。比如：麦克风，扬声器的I/O接口叫做**声卡**；显示器的I/O接口叫做**显卡**；鼠标、键盘、U盘的I/O接口叫做**USB接口**。看的出来，不同设备的I/O接口不同。</span><br><span class="line"></span><br><span class="line">**I/O接口**可以是电路板，可以是芯片，但是它的本质就是一个变换器。将处理器的信号转换成外围设备能看懂的信号，以及将外围设备的信号转换成处理器能理解的信号。</span><br><span class="line"></span><br><span class="line">问题也随之而来：</span><br><span class="line">- 总不能所有的I/O设备都和处理器相连，如果这样做了，那扩展性也基本上无，该如何解决？</span><br><span class="line">- 每个I/O设备都抢着和处理器信息处理，没有一个合理的机制，一定会发生冲突，这个机制该如何实现？</span><br><span class="line"></span><br><span class="line">第一个问题的解决方法：两者之间加一个中间层，也就是**总线**。比如：USB总线。总线连接所有的外围设备和处理器，且每个连接到总线上的器件**必须**有**电子开关**，这样才能随时和加入和断开。</span><br><span class="line"></span><br><span class="line">第二个问题的解决方法：使用输入输出控制设备集中器（ICH）芯片。它的作用就是连接不同的总线，并且I/O设备对处理器访问的协调工作，也就是南桥。比如ICH连接USB总线、IDE/SATA总线、PCI/PCIE总线（扩展）。而且每个I/O接口可能连接不止一个设备，比如USB接口连接鼠标、键盘、U盘。因为同类型设备不唯一的缘故，它们内部也有线路服用和仲裁的总线体系，叫做通信总线或者设备总线。当处理器想和某个设备交流，ICH就会让其他无关设备闭嘴。</span><br><span class="line"></span><br><span class="line">#### I/O端口和端口访问</span><br><span class="line"></span><br><span class="line">在上面*外围设备及其接口*的基础上来具体说说外围设备和处理器交流之间的细节。</span><br><span class="line"></span><br><span class="line">处理器是通过**端口**来和外围设备打交道的。而端口本质上就是一些处于I/O接口电路中的寄存器。每一个I/O接口都可能有好几个端口，分别用于不同的目的。比如用来连接硬盘的*PATA/SATA*接口就有好几个端口，比如命令端口、状态端口、参数端口和数据端口。由于其本质上是寄存器，因此和处理器内的寄存器类似，都有其对应的数据宽度。比如8位、16位，这是设备和I/O接口制造者之间的协议。</span><br><span class="line"></span><br><span class="line">端口在不同的计算机系统中的实现方式是不同的，比如有些时将其端口号映射到内存地址中（0xE0001 ~ 0x FFFFF），访问这些内存实际上就是在访问对应的I/O接口；也有部分计算机系统是将端口独立编制的，和内存不发生关系。本文只有独立编制的方式。</span><br><span class="line"></span><br><span class="line">所有的端口都是进行统一的编号的，比如：0x0001、0x0002。每个I/O接口电路都会分配多个端口。在Intel系统中，只允许65536个端口存在，端口号范围：0 ~ 65535。由于是进行独立编制的，就不能使用`mov`指令，取而代之的是`in`和`out`指令。</span><br><span class="line"></span><br><span class="line">`in`指令是从端口进行读：</span><br><span class="line">```asm</span><br><span class="line">    in al,dx    ;访问8位端口</span><br><span class="line">    in ax,dx    ;访问16位端口</span><br><span class="line">    in al,0xf0  ;访问0xf0端口</span><br></pre></td></tr></table></figure>
+<ol>
+<li>目的操作数必须是寄存器<code>AL</code>或者<code>AX</code>。原操作数应该为寄存器<code>DX</code>。</li>
+<li><code>in</code>指令不允许使用内存单元当做操作数。</li>
+<li>虽然可以使用立即数来指定端口，但是只允许一个字节，不能大于255的端口号。</li>
+<li>它并没有影响任何的标志位。</li>
+</ol>
+<p><code>out</code>指令和<code>in</code>功能相反，因此要求也就是:目的操作数为寄存器<code>DX</code>或者8位立即数。源操作数必须是寄存器<code>AL</code>或者<code>AX</code>。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">out 0x37,al     ;8位端口</span><br><span class="line">out 0xf5,ax     ;16位端口</span><br><span class="line">out dx,al       ;8位端口，端口号在DX中</span><br><span class="line">out dx,ax       ;16位端口，端口号在DX中</span><br></pre></td></tr></table></figure>
+
+<h4 id="通过硬盘控制端口读扇区数据"><a href="#通过硬盘控制端口读扇区数据" class="headerlink" title="通过硬盘控制端口读扇区数据"></a>通过硬盘控制端口读扇区数据</h4><p>我们都知道硬盘读写的基本单位是扇区。每次至少操作一个扇区，不可能仅仅读写一个扇区中的几个字节。者也就是为什么硬盘是典型的块设备，因为数据交换是块。</p>
+<h5 id="CHS模式"><a href="#CHS模式" class="headerlink" title="CHS模式"></a>CHS模式</h5><p>回忆一下计算机基础知识，硬盘读写数据都要什么？磁头号、柱面号、扇区号，这就是<code>CHS</code>模式。<br>比如我们可以使用<code>bximage</code>来查看我们创建的<code>*.img</code>文件的信息。其中</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">➜  c07 git:(master) ✗ bximage</span><br><span class="line">========================================================================</span><br><span class="line">                                bximage</span><br><span class="line">  Disk Image Creation / Conversion / Resize and Commit Tool for Bochs</span><br><span class="line">         $Id: bximage.cc 14091 2021-01-30 17:37:42Z sshwarts $</span><br><span class="line">========================================================================</span><br><span class="line"></span><br><span class="line">1. Create new floppy or hard disk image</span><br><span class="line">2. Convert hard disk image to other format (mode)</span><br><span class="line">3. Resize hard disk image</span><br><span class="line">4. Commit &#x27;undoable&#x27; redolog to base image</span><br><span class="line">5. Disk image info</span><br><span class="line"></span><br><span class="line">0. Quit</span><br><span class="line"></span><br><span class="line">Please choose one [0] 5</span><br><span class="line"></span><br><span class="line">Disk image info</span><br><span class="line"></span><br><span class="line">What is the name of the image?</span><br><span class="line">[c.img] c07_mbr.img</span><br><span class="line"></span><br><span class="line">disk image mode = &#x27;flat&#x27;</span><br><span class="line">hd_size: 104767488</span><br><span class="line">geometry = 203/16/63 (99 MB)</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>只用看最后一行的<code>geometry = 203/16/63</code>，它的C（磁头号）就是<code>203</code>,H（柱面号）就是<code>16</code>,S（扇区号）就是<code>63</code>。最早的逻辑扇区编制方法是：<code>LBA28</code>。使用28个比特来表示逻辑扇区号。逻辑扇区一共有2^28个扇区，每个扇区有<code>512</code>字节，一共可管理128G。个人计算机上的主硬盘控制器被分配了8位端口，端口号从0x1f0到0x1f7。</p>
+<h5 id="读逻辑扇区，具体过程"><a href="#读逻辑扇区，具体过程" class="headerlink" title="读逻辑扇区，具体过程"></a>读逻辑扇区，具体过程</h5><p>假设要从硬盘上读逻辑扇区，具体过程如下：</p>
+<ol>
+<li>设置需要读取的扇区数量，这个数值要写入 <code>0x1f2</code> 端口。这是个8位的端口，因此每次只能读写255个扇区，如果写入的值是0,表示读取 256 个扇区。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov dx,0x1f2</span><br><span class="line">mov al,0x01</span><br><span class="line">out dx,al</span><br></pre></td></tr></table></figure>
+
+<ol start="2">
+<li>设置其实LBA扇区号。因为扇区的读写是连续的，而<code>LBA28</code>位的编号有足足28位，8086需要将其分割成4段，从低到高分别写入端口<code>0x1f3</code>、<code>0x1f4</code>、<code>0x1f5</code>和<code>0x1f6</code>。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov dx,0x1f2</span><br><span class="line">mov al,1</span><br><span class="line">out dx,al                       ;读取的扇区数</span><br><span class="line"></span><br><span class="line">inc dx                          ;0x1f3</span><br><span class="line">mov ax,si</span><br><span class="line">out dx,al                       ;LBA地址7~0</span><br><span class="line"></span><br><span class="line">inc dx                          ;0x1f4</span><br><span class="line">mov al,ah</span><br><span class="line">out dx,al                       ;LBA地址15~8</span><br><span class="line"></span><br><span class="line">inc dx                          ;0x1f5</span><br><span class="line">mov ax,di</span><br><span class="line">out dx,al                       ;LBA地址23~16</span><br><span class="line"></span><br><span class="line">inc dx                          ;0x1f6</span><br><span class="line">mov al,0xe0                     ;LBA28模式，主盘</span><br><span class="line">or al,ah                        ;LBA地址27~24</span><br><span class="line">out dx,al</span><br><span class="line"></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>向端口<code>0x1f7</code>写入<code>0x20</code>，请求硬盘读，也是8位端口。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">inc dx                          ;0x1f7</span><br><span class="line">mov al,0x20                     ;读命令</span><br><span class="line">out dx,al</span><br></pre></td></tr></table></figure>
+
+
+<ol start="4">
+<li>等待读写操作完成。 向端口<code>0x1f7</code>发送读写命令后，<code>0x1f7</code>端口的第7个标志位为”1”表示正在工作，第3个标志位为”1”表示准备好发送或者接收数据。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">.waits:</span><br><span class="line">       in al,dx</span><br><span class="line">       and al,0x88</span><br><span class="line">       cmp al,0x08</span><br><span class="line">       jnz .waits                      ;不忙，且硬盘已准备好数据传输 </span><br></pre></td></tr></table></figure>
+<p>不是上面刚说了不要有<code>magic number</code>嘛？这里的<code>0x88</code>和<code>0x08</code>是什么鬼？先看<code>add al,0x88</code>因为<code>0x88</code>的二进制形式是<code>1000 1000</code>。第7位和第3位为1,有没有反应过来？又因为是<code>and</code>，这条指令实质上是保留寄存器<code>AL</code>中的第7位和第3位。如果寄存器<code>AL</code>中为<code>00001000</code>就说明是推出等待状态，可以继续往下操作了。</p>
+<ol start="5">
+<li>接下来就要连续取出数据。<code>0x1f0</code>是硬盘接口的数据接口，是一个16位端口。一旦硬盘控制器空闲，且准备就绪，就可以连续从该<strong>端口写入或者读取数据</strong>。下面代码举了个例子，从硬盘中读取一个扇区，将其存放到段寄存器<strong>DS</strong>指定的数据段，偏移量由寄存器<code>BX</code>指定：</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">       mov cx,256                      ;总共要读取的字节数</span><br><span class="line">       mov dx,0x1f0                    ;数据接口</span><br><span class="line">.readw:</span><br><span class="line">       in ax,dx</span><br><span class="line">       mov [bx],ax</span><br><span class="line">       add bx,2</span><br><span class="line">       loop .readw</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>你如果看的仔细，就会发现：那么<code>0x1f1</code>端口是干嘛的？其实<code>0x1f1</code>是错误寄存器，包含了硬盘驱动器最后一次执行命令后的状态（错误原因）。</p>
+<h3 id="过程调用"><a href="#过程调用" class="headerlink" title="过程调用"></a>过程调用</h3><p>上面这些代码如果每次都要自己来写，那也太折磨人了，尤其是多次读写，不得疯掉。处理器支持一种叫过程调用的指令执行机制，叫做例程。它实质就是一段代码，因为每次进行的操作类似，我们像使用C语言的函数一样的思想。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">read_hard_disk_0:                        ;从硬盘读取一个逻辑扇区</span><br><span class="line">                                         ;输入：DI:SI=起始逻辑扇区号</span><br><span class="line">                                         ;      DS:BX=目标缓冲区地址</span><br><span class="line">         push ax</span><br><span class="line">         push bx</span><br><span class="line">         push cx</span><br><span class="line">         push dx</span><br><span class="line">      </span><br><span class="line">         mov dx,0x1f2</span><br><span class="line">         mov al,1</span><br><span class="line">         out dx,al                       ;读取的扇区数</span><br><span class="line"></span><br><span class="line">         inc dx                          ;0x1f3</span><br><span class="line">         mov ax,si</span><br><span class="line">         out dx,al                       ;LBA地址7~0</span><br><span class="line"></span><br><span class="line">         inc dx                          ;0x1f4</span><br><span class="line">         mov al,ah</span><br><span class="line">         out dx,al                       ;LBA地址15~8</span><br><span class="line"></span><br><span class="line">         inc dx                          ;0x1f5</span><br><span class="line">         mov ax,di</span><br><span class="line">         out dx,al                       ;LBA地址23~16</span><br><span class="line"></span><br><span class="line">         inc dx                          ;0x1f6</span><br><span class="line">         mov al,0xe0                     ;LBA28模式，主盘</span><br><span class="line">         or al,ah                        ;LBA地址27~24</span><br><span class="line">         out dx,al</span><br><span class="line"></span><br><span class="line">         inc dx                          ;0x1f7</span><br><span class="line">         mov al,0x20                     ;读命令</span><br><span class="line">         out dx,al</span><br><span class="line"></span><br><span class="line">  .waits:</span><br><span class="line">         in al,dx</span><br><span class="line">         and al,0x88</span><br><span class="line">         cmp al,0x08</span><br><span class="line">         jnz .waits                      ;不忙，且硬盘已准备好数据传输 </span><br><span class="line"></span><br><span class="line">         mov cx,256                      ;总共要读取的字数</span><br><span class="line">         mov dx,0x1f0</span><br><span class="line">  .readw:</span><br><span class="line">         in ax,dx</span><br><span class="line">         mov [bx],ax</span><br><span class="line">         add bx,2</span><br><span class="line">         loop .readw</span><br><span class="line"></span><br><span class="line">         pop dx</span><br><span class="line">         pop cx</span><br><span class="line">         pop bx</span><br><span class="line">         pop ax</span><br><span class="line">      </span><br><span class="line">         ret</span><br></pre></td></tr></table></figure>
+<p>这里的<code>ret</code>作用也可以类似C语言的函数来理解，进入函数前需要将参数压入栈中，也就是开始的<code>push ax</code>将操作前的寄存器的数值压入栈中。而<code>ret</code>就类似于<code>return</code>，将压入栈中的数值弹出，恢复各个寄存器的数值。这段代码就是我们说的过程。进入该过程时候，需要将<code>SI</code>和<code>DI</code>存入起始逻辑扇区号，<code>SI</code>存入低16位，<code>DI</code>存入高12位。</p>
+<p>那么这个例程我们该如何调用呢？有以下三种调用方式：</p>
+<h4 id="16位相对近调用"><a href="#16位相对近调用" class="headerlink" title="16位相对近调用"></a>16位相对近调用</h4><p>近调用意思是说被调用的目标位于当前的代码段内，所以只需要偏移地址就可以了。</p>
+<p>调用的地址计算：用目标过程的汇编地址减去当前call指令的汇编地址，再减去<code>call</code>指令的字节长度。<br>这里的代码和调试都是从<a href="https://github.com/zhendewokusi/codeOfAssembly/blob/master/booktool/c08/c08_mbr.asm">c08_mbr.asm</a>得到的：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call read_hard_disk_0</span><br></pre></td></tr></table></figure>
+<p>只看我们向看的：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">&lt;bochs:14&gt; </span><br><span class="line">Next at t=17178875</span><br><span class="line">(0) [0x000000007c20] 0000:7c20 (unk. ctxt): call .+81  (0x00007c74)   ; e85100</span><br></pre></td></tr></table></figure>
+<p>所以我们可以看出来，这里并不是一个地址，而是一个偏移量。这里需要注意的是如果<strong>调用过程</strong>在当前指令前面，那么相对量是个正数，反之就是负数。再比如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call 0x0500</span><br></pre></td></tr></table></figure>
+<p>这里本质上和上一个一样，绝不是将<code>0x0500</code>出现在机器码中，而是用这个数值减去当前指令的汇编地址来得到一个偏移量。</p>
+<h4 id="16位间接绝对近调用"><a href="#16位间接绝对近调用" class="headerlink" title="16位间接绝对近调用"></a>16位间接绝对近调用</h4><p>这种也是近调用，只能调用当前代码段内的过程，指令中的操作数就不是偏移量了，而是被调用过程的<strong>真实偏移地址</strong>，故成为<strong>绝对地址</strong>。但是！这个偏移地址不是直接出现在指令中，而是由<strong>16位通用寄存器或者16位内存单元</strong>间接给出，比如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call cx             ;被调用过程的偏移地址位于寄存器CX内，在指令执行时候有处理器从该寄存器中取得</span><br><span class="line">call [0x3000]       ;处理器访问数据段（使用DS）,从偏移地址0x3000处取得一个字作为目标过程的真实偏移地址</span><br><span class="line">call [bx]           ;原理同2</span><br><span class="line">call [bx+si+0x02]   ;原理同2</span><br></pre></td></tr></table></figure>
+
+<h4 id="16位直接绝对远"><a href="#16位直接绝对远" class="headerlink" title="16位直接绝对远"></a>16位直接绝对远</h4><p>这种调用属于段间调用，即调用另一个代码段内的过程，所以被称为远调用。即需要被调用过程所在的段地址，也需要该过程在段内的偏移地址。比如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call 0x2000:0x0030</span><br></pre></td></tr></table></figure>
+<p>当然你想玩个<code>call</code>的被调用过程处于当前代码段内，处理器也会从当前代码段转移到当前代码段。</p>
+<h4 id="16位间接绝对远调用"><a href="#16位间接绝对远调用" class="headerlink" title="16位间接绝对远调用"></a>16位间接绝对远调用</h4><p>这也属于段间调用，被调用过程位于另一个代码段内，而且段地址和偏移地址都是间接给出的，比如：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">call far [0x2000]</span><br><span class="line">call far [proc_l]</span><br><span class="line">call far [bx]</span><br><span class="line">call far [bx+si]</span><br></pre></td></tr></table></figure>
+
+<p>间接远调用必须使用关键字<code>far</code>。指令中给出的是偏移地址，而段地址在偏移地址的后面。看下面的例子：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">proc_1 dw 0x0102,0x2000</span><br><span class="line">call far [proc_1]</span><br><span class="line">call far [bx]</span><br><span class="line">call far [bx+si]</span><br></pre></td></tr></table></figure>
+
+<p>当这条指令执行时，处理器访问由段寄存器DS指向的数据段，从指令中指定的偏移地址处取两个字（分别是段地址<code>0x2000</code>和偏移地址<code>0x0102</code>）；然后将代码段寄存器<code>CS</code>和指令指针寄存器<code>IP</code>的当前内容压栈，最后用刚才取得的段地址和偏移地址代替<code>CS</code>和<code>IP</code>的数值。剩下两个也是同理。</p>
+<p>而过程调用完就需要返回，叫做<strong>过程返回</strong>。</p>
+<h4 id="返回指令-ret"><a href="#返回指令-ret" class="headerlink" title="返回指令 ret"></a>返回指令 <code>ret</code></h4><p>当它执行的时候，处理器只做一件事情，就是从栈中弹出来一个字到指令指针寄存器<strong>IP</strong>中。</p>
+<h4 id="返回指令-retf"><a href="#返回指令-retf" class="headerlink" title="返回指令 retf"></a>返回指令 <code>retf</code></h4><p>当它执行的时候，处理器分别从栈中弹出来两个字到指令指针寄存器<code>IP</code>和代码段寄存器<code>CS</code>中。</p>
+<h4 id="恢复"><a href="#恢复" class="headerlink" title="恢复"></a>恢复</h4><p>在示例代码中，将<code>AX</code>，<code>BX</code>，<code>CX</code>，<code>DX</code>的数值<code>push</code>进了栈，在过程的最后，就是恢复。反序弹出4个寄存器的数值。此时栈指针回到了进入过程内部时的位置（这很重要！）。</p>
+<h4 id="加载用户程序"><a href="#加载用户程序" class="headerlink" title="加载用户程序"></a>加载用户程序</h4><p>可以看示例代码<a href="https://github.com/zhendewokusi/codeOfAssembly/blob/master/booktool/c08/c08.asm">c08.asm</a>:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">SECTION header vstart=0                     ;定义用户程序头部段 </span><br><span class="line">    program_length  dd program_end          ;程序总长度[0x00]</span><br><span class="line">    </span><br><span class="line">    ;用户程序入口点</span><br><span class="line">    code_entry      dw start                ;偏移地址[0x04]</span><br><span class="line">                    dd section.code_1.start ;段地址[0x06] </span><br><span class="line">    </span><br><span class="line">    realloc_tbl_len dw (header_end-code_1_segment)/4</span><br><span class="line">                                            ;段重定位表项个数[0x0a]</span><br><span class="line">    </span><br><span class="line">    ;段重定位表           </span><br><span class="line">    code_1_segment  dd section.code_1.start ;[0x0c]</span><br><span class="line">    code_2_segment  dd section.code_2.start ;[0x10]</span><br><span class="line">    data_1_segment  dd section.data_1.start ;[0x14]</span><br><span class="line">    data_2_segment  dd section.data_2.start ;[0x18]</span><br><span class="line">    stack_segment   dd section.stack.start  ;[0x1c]</span><br><span class="line">    </span><br><span class="line">    header_end:                </span><br><span class="line">    </span><br></pre></td></tr></table></figure>
+<p>和示例代码<a href="https://github.com/zhendewokusi/codeOfAssembly/blob/master/booktool/c08/c08_mbr.asm">c08_mbr.asm</a>:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">mov dx,[2]</span><br><span class="line">mov ax,[0]</span><br><span class="line"></span><br><span class="line">mov bx,512                      ;512字节每扇区</span><br><span class="line">div bx                          ;商存储在AX中，余数存储在DX</span><br><span class="line">cmp dx,0</span><br><span class="line">jnz @1                          ;未除尽，因此结果比实际扇区数少1 </span><br><span class="line">dec ax                          ;已经读了一个扇区，扇区总数减1 </span><br></pre></td></tr></table></figure>
+
+<p>前两条指令是将<code>program_length</code>也就是整个程序的大小的高16位置传送到寄存器<code>DX</code>，低16位寄存器传送到寄存器<code>AX</code>中。</p>
+<h6 id="cmp-jz-jnz指令理解"><a href="#cmp-jz-jnz指令理解" class="headerlink" title="cmp jz jnz指令理解"></a>cmp jz jnz指令理解</h6><p><code>cmp</code>指令中，如果两个操作数相等，则ZF被设置为1，表示条件为假或”等于零”；如果ZF为0，表示条件为真或”不等于零”。你可能觉得反直觉，<code>cmp</code>指令本质上是将两个数字相减，如果是 0 就将ZF设置为 1。</p>
+<p><code>jz</code> 和 <code>jnz</code> 指令分别根据 ZF 的状态来决定是否跳转。具体来说：</p>
+<ul>
+<li><code>jnz</code>（Jump if Not Zero）指令会在ZF标志位不等于1时跳转，也就是在条件为真（不等于零）时跳转。</li>
+<li><code>jz</code>（Jump if Zero）指令会在ZF标志位等于1时跳转，也就是在条件为假（等于零）时跳转。</li>
+</ul>
+<p>简单记就是：如果条件为真，也就是 1 ,也就是”if Not Zero”，也就对应了<code>jnz</code>，<code>jz</code>同理。</p>
+<p>有了上面的知识储备，让我们来看下面代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line"> cmp dx,0</span><br><span class="line"> jnz @1                          </span><br><span class="line"></span><br><span class="line">@1:</span><br><span class="line">      cmp ax,0                        ;考虑实际长度小于等于512个字节的情况 </span><br><span class="line">      jz direct</span><br><span class="line">      </span><br><span class="line">      ;读取剩余的扇区</span><br><span class="line">      push ds                         ;以下要用到并改变DS寄存器 </span><br><span class="line"></span><br><span class="line">      mov cx,ax                       ;循环次数（剩余扇区数）</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>如果<code>dx != 0</code>那么就跳入<code>@1</code>标签内。而下面是如果<code>ax == 0</code>就进入标签<code>dircrt</code>处执行指令。</p>
+]]></content>
+      <tags>
+        <tag>x86汇编</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>地址、section、vstart</title>
+    <url>/2023/10/14/%E5%9C%B0%E5%9D%80%E3%80%81section%E3%80%81vstart/</url>
+    <content><![CDATA[<h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>我在学习汇编的时候，对于<code>vstart</code>的概念其实很模糊，感觉会又感觉不是很会，要说哪儿不会有说不出来，就很难受。<code>vstart</code>是<code>section</code>中的概念，但是要讲清楚什么是<code>section</code>，就必须说说什么是地址了。</p>
+<span id="more"></span>
+
+<h3 id="地址"><a href="#地址" class="headerlink" title="地址"></a>地址</h3><h4 id="地址的概念"><a href="#地址的概念" class="headerlink" title="地址的概念"></a>地址的概念</h4><p>计算机里面只有0和1,地址当然就是一串数字，这串数字用来描述各种符号在源程序中的位置。地址细分又能分为：物理地址、虚拟地址布拉布拉的，这里不做深究。</p>
+<p>在汇编中，由于指令和变量占据的内存大小不一样，总不能想怎么来就怎么来，那么就得有一套统一的规则来分配。程序中各种数据结构的访问，本质上是通过“该数据结构的起始地址 + 该数据结构在该硬件平台规定的变量所占据的内存大小”来实现的。这里也就解释了，为什么<code>C语言</code>等高级语言中为什么要定义变量的类型，因为这样才能正确的分配和访问变量占据的内存。</p>
+<p>那么这里的起始地址是如何得到的呢？编译器在做这件事情的时候，占据第一位的数据的地址便是整个程序的起始地址，后面的数据都是在它基础上的偏移。第n个数据所在的位置就是：第n-1个数据的偏移 + 数据 n-1 的内存空间，这就是所谓的<strong>偏移量</strong>，每个变量的地址都是前一个变量的地址 + 前一个变量的内存空间大小。</p>
+<h4 id="简单例子"><a href="#简单例子" class="headerlink" title="简单例子"></a>简单例子</h4><p>来看个简单例子：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">  mov ax,$$</span><br><span class="line">  mov ds,ax</span><br><span class="line">  mov ax,[var]</span><br><span class="line">  label : mov ax,$</span><br><span class="line">  jmp label</span><br><span class="line">  var dw 0x99</span><br><span class="line">  infi: jmp near infi                 ;无限循环</span><br><span class="line"></span><br><span class="line">times (510-($-$$)) db 0               ;主引导程序512字节，空余的使用0填充</span><br><span class="line">          db 0x55,0xaa                ;结束标志               </span><br></pre></td></tr></table></figure>
+<p>下面将其放在bochs中进行调试的输出信息：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">&lt;bochs:1&gt; b 0x07c00</span><br><span class="line">&lt;bochs:2&gt; c</span><br><span class="line">(0) Breakpoint 1, 0x00007c00 in ?? ()</span><br><span class="line">Next at t=17178863</span><br><span class="line">(0) [0x000000007c00] 0000:7c00 (unk. ctxt): mov ax, 0x0000            ; b80000</span><br><span class="line">&lt;bochs:3&gt; n</span><br><span class="line">Next at t=17178864</span><br><span class="line">(0) [0x000000007c03] 0000:7c03 (unk. ctxt): mov ds, ax                ; 8ed8</span><br><span class="line">&lt;bochs:4&gt; </span><br><span class="line">Next at t=17178865</span><br><span class="line">(0) [0x000000007c05] 0000:7c05 (unk. ctxt): mov ax, word ptr ds:0x000d ; a10d00</span><br><span class="line">&lt;bochs:5&gt; </span><br><span class="line">Next at t=17178866</span><br><span class="line">(0) [0x000000007c08] 0000:7c08 (unk. ctxt): mov ax, 0x0008            ; b80800</span><br><span class="line">&lt;bochs:6&gt; </span><br><span class="line">Next at t=17178867</span><br><span class="line">(0) [0x000000007c0b] 0000:7c0b (unk. ctxt): jmp .-5  (0x00007c08)     ; ebfb</span><br><span class="line">&lt;bochs:7&gt; </span><br><span class="line">Next at t=17178868</span><br><span class="line">(0) [0x000000007c08] 0000:7c08 (unk. ctxt): mov ax, 0x0008            ; b80800</span><br><span class="line">&lt;bochs:8&gt; </span><br><span class="line">Next at t=17178869</span><br><span class="line">(0) [0x000000007c0b] 0000:7c0b (unk. ctxt): jmp .-5  (0x00007c08)     ; ebfb</span><br></pre></td></tr></table></figure>
+<p>可以看到第一行的mov指令，<code>$$</code>被替换成了<code>0</code>。默认情况下如果程序没有定义<code>section</code>就将所有的文件当作一个大的<code>section</code>，因此此时<code>$$</code>为<code>0</code>。</p>
+<p>第三行引用了<code>var</code>变量的值，而<code>[]</code>是去所在地址的内容。<code>mov ax, word ptr ds:0x000d ;</code>就是表明要将一个16位的数据从内存地址 <code>0x000d</code> 处加载到寄存器 <code>AX</code> 中。至于为什么是<code>0x000d</code>后面会解释。</p>
+<p>第四行用了一个<code>$</code>标号，代表当前指令所在的地址。</p>
+<p>最后一行就是一个数据的定义，没什么好讲的。</p>
+<p>还记得上面讲的地址的计算吗？看调试第一行的左侧的地址<code>0x000000007c00</code>和第二行地址<code>0x000000007c03</code>，这两个之间相差3,而第一个指令转换成机器码是<code>b80000</code>刚好三个字节。有没有理解计算机的地址了？再依次往下算，刚好<code>var dw 0x99</code>的地址就是<code>0x000000007c0b</code> + 对应的机器码<code>ebfb</code>的长度，也就是<code>0x000000007c0d</code>，就将这个结果<code>0x000000007c0d - 0x000000007c00</code> 后得到的偏移量是不是 <code>0x000d</code>，也就是变量<code>var</code>的地址。</p>
+<h3 id="section"><a href="#section" class="headerlink" title="section"></a>section</h3><p>我刚开始对<code>section</code>感觉就是在似懂非懂，这个东西称为节。编译器提供的这个关键字只是给程序员用的，处理器根本不知道有这么个东西，你会想：既然CPU又不知道这么个东西，我用不用<code>section</code>都行吧。是这样的，但是最好使用，因为<code>section</code>的功能类似与函数，人为的将代码划分为不同的部分，都是为了代码结构清晰，易于维护。</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">SECTION code</span><br><span class="line">    mov ax,$$</span><br><span class="line">    mov ax,section.data.start</span><br><span class="line">    mov ax,section.code.start</span><br><span class="line">    mov ax,[var1]</span><br><span class="line">    label: jmp label</span><br><span class="line"></span><br><span class="line">    infi: jmp near infi                 ;无限循环</span><br><span class="line"> </span><br><span class="line">  times (510-($-$$)) db 0</span><br><span class="line">            db 0x55,0xaa</span><br><span class="line"></span><br><span class="line">SECTION data</span><br><span class="line">    var1 dd 0x4</span><br></pre></td></tr></table></figure>
+<p>下面将其放在bochs中进行调试的输出信息：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">(0) [0x0000fffffff0] f000:fff0 (unk. ctxt): jmpf 0xf000:e05b          ; ea5be000f0</span><br><span class="line">&lt;bochs:1&gt; b 0x07c00</span><br><span class="line">&lt;bochs:2&gt; c</span><br><span class="line">(0) Breakpoint 1, 0x00007c00 in ?? ()</span><br><span class="line">Next at t=17178863</span><br><span class="line">(0) [0x000000007c00] 0000:7c00 (unk. ctxt): mov ax, 0x0000            ; b80000</span><br><span class="line">&lt;bochs:3&gt; n</span><br><span class="line">Next at t=17178864</span><br><span class="line">(0) [0x000000007c03] 0000:7c03 (unk. ctxt): mov ax, 0x0200            ; b80002</span><br><span class="line">&lt;bochs:4&gt; </span><br><span class="line">Next at t=17178865</span><br><span class="line">(0) [0x000000007c06] 0000:7c06 (unk. ctxt): mov ax, 0x0000            ; b80000</span><br><span class="line">&lt;bochs:5&gt; </span><br><span class="line">Next at t=17178866</span><br><span class="line">(0) [0x000000007c09] 0000:7c09 (unk. ctxt): mov ax, word ptr ds:0x0200 ; a10002</span><br><span class="line">&lt;bochs:6&gt; </span><br><span class="line">Next at t=17178867</span><br><span class="line">(0) [0x000000007c0c] 0000:7c0c (unk. ctxt): jmp .-2  (0x00007c0c)     ; ebfe</span><br><span class="line">&lt;bochs:7&gt; </span><br><span class="line">Next at t=17178868</span><br><span class="line">(0) [0x000000007c0c] 0000:7c0c (unk. ctxt): jmp .-2  (0x00007c0c)     ; ebfe</span><br></pre></td></tr></table></figure>
+
+<p>在调试信息中我们注意到：</p>
+<ul>
+<li><p><code>SECTION code</code> 和 <code>SECTION data</code> 一个字节的机器码都没有产生，也印证了前面说的处理器并不知道有<code>SECTION</code>的存在。</p>
+</li>
+<li><p><code>section.data.start</code>实际上就是本文件中名为<code>data</code>的<code>section</code>的真实偏移。这个或许看不出来，可以看<code>mov ax,section.code.start</code>的偏移，也就是调试信息中的<code>0000:7c06 (unk. ctxt): mov ax, 0x0000</code>，可以看到<code>code</code>的偏移量为0，符合我们的预期。</p>
+</li>
+</ul>
+<h3 id="vstart"><a href="#vstart" class="headerlink" title="vstart"></a>vstart</h3><p>根据nasm官方手册的解释：<code>section</code>使用<code>vstart</code>修饰后，就可以被赋予一个虚拟起始地址<code>virtual start address</code>。而<code>org</code>和<code>vstart</code>实际上是同一功能，我就只展示其中一个，另外一个原理相同。</p>
+<p>特别需要注意的是：<code>vstart</code>和<code>org</code>都不会让程序加载到地址xxx。它们做的只是告诉编译器将这个节之后的数据、指令的地址按照xxx为起始，就这么个功能。而加载是加载器的功能，编译器没这本事。</p>
+<p>光听概念太枯燥，还是来看个代码：</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">SECTION code vstart=0x7c00</span><br><span class="line">    mov ax,$$</span><br><span class="line">    mov ax,section.data.start</span><br><span class="line">    mov ax,section.code.start</span><br><span class="line">    mov ax,[var1]</span><br><span class="line">    label: jmp label</span><br><span class="line"></span><br><span class="line">    infi: jmp near infi                 ;无限循环</span><br><span class="line"> </span><br><span class="line">  times (510-($-$$)) db 0</span><br><span class="line">            db 0x55,0xaa</span><br><span class="line"></span><br><span class="line">SECTION data </span><br><span class="line">    var1 dd 0x4</span><br></pre></td></tr></table></figure>
+<p>下面将其放在bochs中进行调试的输出信息：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">(0) [0x0000fffffff0] f000:fff0 (unk. ctxt): jmpf 0xf000:e05b          ; ea5be000f0</span><br><span class="line">&lt;bochs:1&gt; b 0x07c00</span><br><span class="line">&lt;bochs:2&gt; c</span><br><span class="line">(0) Breakpoint 1, 0x00007c00 in ?? ()</span><br><span class="line">Next at t=17178863</span><br><span class="line">(0) [0x000000007c00] 0000:7c00 (unk. ctxt): mov ax, 0x7c00            ; b8007c</span><br><span class="line">&lt;bochs:3&gt; n</span><br><span class="line">Next at t=17178864</span><br><span class="line">(0) [0x000000007c03] 0000:7c03 (unk. ctxt): mov ax, 0x0200            ; b80002</span><br><span class="line">&lt;bochs:4&gt; </span><br><span class="line">Next at t=17178865</span><br><span class="line">(0) [0x000000007c06] 0000:7c06 (unk. ctxt): mov ax, 0x0000            ; b80000</span><br><span class="line">&lt;bochs:5&gt; </span><br><span class="line">Next at t=17178866</span><br><span class="line">(0) [0x000000007c09] 0000:7c09 (unk. ctxt): mov ax, word ptr ds:0x0900 ; a10009</span><br><span class="line">&lt;bochs:6&gt; </span><br><span class="line">Next at t=17178867</span><br><span class="line">(0) [0x000000007c0c] 0000:7c0c (unk. ctxt): jmp .-2  (0x00007c0c)     ; ebfe</span><br><span class="line">&lt;bochs:7&gt; </span><br><span class="line">Next at t=17178868</span><br><span class="line">(0) [0x000000007c0c] 0000:7c0c (unk. ctxt): jmp .-2  (0x00007c0c)     ; ebfe</span><br></pre></td></tr></table></figure>
+
+<p>可以看到<code>code</code>加了<code>vstart</code>后，<code>$$</code>从<code>0</code>变成<code>0x7c00</code>。所以该节中的数据地址从<code>0x7c00</code>为起始编址。这个是虚拟的地址，因为这个程序整个才512字节，根本到不了偏移量为<code>0x7c00</code>。<code>$$</code>以该节的虚拟起始地址为主，如果这个节没有<code>vstart</code>来指定起始地址，就输出在文件中偏移地址。而此时的<code>$</code>就是 当前的新的地址 + 偏移。 </p>
+<p><code>section.data.start</code>实际上就是本文件中名为<code>data</code>的<code>section</code>的真实偏移，没有因为<code>vstart</code>改变。</p>
+]]></content>
+      <tags>
+        <tag>x86汇编</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>指针和数组</title>
+    <url>/2023/10/11/%E6%8C%87%E9%92%88%E5%92%8C%E6%95%B0%E7%BB%84/</url>
+    <content><![CDATA[<h3 id="指针和数组"><a href="#指针和数组" class="headerlink" title="指针和数组"></a>指针和数组</h3><p>C 语言中指针和数组这两个概念密不可分，以至于如果没有理解其中一个概念，就无法彻底理解另一个概念。</p>
+<h4 id="数组"><a href="#数组" class="headerlink" title="数组"></a>数组</h4><p>很基础的一些知识点我就不重复了。关于数组，需要注意的有两个点：</p>
+<ol>
+<li>C 语言中只有一维数组，而且编译期间就要知道数组的精确大小。数组的元素可以是任何类型的对象，当然也包含了数组，这也就是多维数组。</li>
+<li>对于一个数组，我们其实只能干两件事情：确定数组的大小、获取指向该数组下标为 0 的元素的指针。看到这话你是不是要反驳我了：不对呀，你写博客写糊涂了吧？我还可以<code>arr[1]</code>的操作呀。其实<code>[]</code>操作的本质是通过指针来实现的。比如<code>arr[i] = 1</code>其实上是<code>*(arr + i) = 1</code>，这里的 <code>arr</code>就是指向该数组下标为 0 的元素的指针。<span id="more"></span></li>
+</ol>
+<p>既然<code>arr[0] = 1</code>本质上是<code>*(arr + 0) = 1</code>，那么我们可以整个活:</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="number">0</span>[arr] = <span class="number">1</span>;</span><br></pre></td></tr></table></figure>
+<p>读者可以自行尝试一下，这样的代码是否可行。</p>
+<h4 id="二维数组"><a href="#二维数组" class="headerlink" title="二维数组"></a>二维数组</h4><h5 id="二维数组内存相关"><a href="#二维数组内存相关" class="headerlink" title="二维数组内存相关"></a>二维数组内存相关</h5><ul>
+<li><p>第一种情况：是直接声明的二维数组</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">int</span> rows = <span class="number">3</span>; <span class="comment">// 行数</span></span><br><span class="line">    <span class="type">int</span> cols = <span class="number">4</span>; <span class="comment">// 列数</span></span><br><span class="line">    <span class="type">int</span> arr[rows][cols];</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 初始化二维数组</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; rows; i++) &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; cols; j++) &#123;</span><br><span class="line">            arr[i][j] = i * cols + j;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 验证地址连续性</span></span><br><span class="line">    <span class="type">int</span> *ptr = &amp;arr[<span class="number">0</span>][<span class="number">0</span>];</span><br><span class="line">    <span class="type">int</span> isContiguous = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; rows; i++) &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; cols; j++) &#123;</span><br><span class="line">            <span class="comment">// 计算下一个元素的地址</span></span><br><span class="line">            <span class="type">int</span> *nextPtr = &amp;arr[i][j];</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%p\n&quot;</span>,&amp;arr[i][j]);</span><br><span class="line">            <span class="keyword">if</span> (nextPtr != ptr) &#123;</span><br><span class="line">                isContiguous = <span class="number">0</span>;</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            ptr++;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (isContiguous) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;二维数组的地址是连续的。\n&quot;</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;二维数组的地址不是连续的。\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>运行结果如下：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">0x7fff2f05bb80</span><br><span class="line">0x7fff2f05bb84</span><br><span class="line">0x7fff2f05bb88</span><br><span class="line">0x7fff2f05bb8c</span><br><span class="line">0x7fff2f05bb90</span><br><span class="line">0x7fff2f05bb94</span><br><span class="line">0x7fff2f05bb98</span><br><span class="line">0x7fff2f05bb9c</span><br><span class="line">0x7fff2f05bba0</span><br><span class="line">0x7fff2f05bba4</span><br><span class="line">0x7fff2f05bba8</span><br><span class="line">0x7fff2f05bbac</span><br><span class="line">二维数组的地址是连续的。</span><br></pre></td></tr></table></figure>
+</li>
+<li><p>第二种情况：使用malloc来分配一个二维数组</p>
+</li>
+</ul>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="type">int</span> rows = <span class="number">3</span>; <span class="comment">// 行数</span></span><br><span class="line">    <span class="type">int</span> cols = <span class="number">4</span>; <span class="comment">// 列数</span></span><br><span class="line"></span><br><span class="line">    <span class="comment">// 使用malloc分配内存</span></span><br><span class="line">    <span class="type">int</span> **arr = (<span class="type">int</span> **)<span class="built_in">malloc</span>(rows * <span class="keyword">sizeof</span>(<span class="type">int</span> *));</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; rows; i++) &#123;</span><br><span class="line">        arr[i] = (<span class="type">int</span> *)<span class="built_in">malloc</span>(cols * <span class="keyword">sizeof</span>(<span class="type">int</span>));</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 初始化二维数组</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; rows; i++) &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; cols; j++) &#123;</span><br><span class="line">            arr[i][j] = i * cols + j;</span><br><span class="line">            <span class="built_in">printf</span>(<span class="string">&quot;%p\n&quot;</span>, (<span class="type">void</span> *)&amp;arr[i][j]);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 验证地址连续性</span></span><br><span class="line">    <span class="type">int</span> *ptr = &amp;arr[<span class="number">0</span>][<span class="number">0</span>];</span><br><span class="line">    <span class="type">int</span> isContiguous = <span class="number">1</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; rows; i++) &#123;</span><br><span class="line">        <span class="keyword">for</span> (<span class="type">int</span> j = <span class="number">0</span>; j &lt; cols; j++) &#123;</span><br><span class="line">            <span class="comment">// 计算下一个元素的地址</span></span><br><span class="line">            <span class="type">int</span> *nextPtr = &amp;arr[i][j];</span><br><span class="line">            <span class="keyword">if</span> (nextPtr != ptr) &#123;</span><br><span class="line">                isContiguous = <span class="number">0</span>;</span><br><span class="line">                <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            ptr++;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">if</span> (isContiguous) &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;通过malloc分配的二维数组的地址是连续的。\n&quot;</span>);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="built_in">printf</span>(<span class="string">&quot;通过malloc分配的二维数组的地址不是连续的。\n&quot;</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 释放分配的内存</span></span><br><span class="line">    <span class="keyword">for</span> (<span class="type">int</span> i = <span class="number">0</span>; i &lt; rows; i++) &#123;</span><br><span class="line">        <span class="built_in">free</span>(arr[i]);</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="built_in">free</span>(arr);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>运行结果如下：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">0x55b2818142c0</span><br><span class="line">0x55b2818142c4</span><br><span class="line">0x55b2818142c8</span><br><span class="line">0x55b2818142cc</span><br><span class="line">0x55b2818142e0</span><br><span class="line">0x55b2818142e4</span><br><span class="line">0x55b2818142e8</span><br><span class="line">0x55b2818142ec</span><br><span class="line">0x55b281814300</span><br><span class="line">0x55b281814304</span><br><span class="line">0x55b281814308</span><br><span class="line">0x55b28181430c</span><br><span class="line">通过malloc分配的二维数组的地址不是连续的。</span><br></pre></td></tr></table></figure>
+<p>通过 <code>malloc</code> 分配的二维数组的地址在内存中通常是不连续的。<code>malloc</code> 函数分配的内存块是堆内存，这些内存块通常在堆中的不同位置。因此，二维数组的各行和各列在内存中可能是分散的，<strong>不一定</strong>是连续的。</p>
+<p>当你使用 <code>malloc</code> 分配一个二维数组时，你实际上在堆中创建了一个指向指针的数组，其中每个指针指向一个独立的内存块（一维数组），这些内存块存储了实际的数据。因此，二维数组的不同行在堆中的不同位置，它们不是物理上连续的内存块。</p>
+<p>如果你需要连续的内存块以便于优化访问或传递给函数，你可以使用一维数组来模拟二维数组，并在计算索引时手动进行转换，以使其在一维数组中是连续的。这将涉及到一些数学运算，但可以帮助你实现连续内存存储。</p>
+<p>如果你需要大规模的多维数组，并且连续内存非常重要，你可能需要考虑使用静态数组或者专门设计的数据结构，而不是 <code>malloc</code> 动态分配的内存。</p>
+]]></content>
+      <tags>
+        <tag>C语言</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>条款 21 :优先选用 std::make_unique 和std::make_shared, 而非直接使用 new</title>
+    <url>/2023/10/09/%E6%9D%A1%E6%AC%BE21/</url>
+    <content><![CDATA[<h4 id="使用std-make-shared的理由-代码精简"><a href="#使用std-make-shared的理由-代码精简" class="headerlink" title="使用std::make_shared的理由:代码精简"></a>使用std::make_shared的理由:代码精简</h4><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">auto</span> <span class="title">upw1</span><span class="params">(std::make_unique&lt;Widget&gt;())</span></span>;</span><br><span class="line"><span class="function">std::unique_ptr&lt;Widget&gt; <span class="title">upw2</span><span class="params">(<span class="keyword">new</span> Widget)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">auto</span> <span class="title">spw1</span><span class="params">(std::make_shared&lt;Widget&gt;())</span></span>;</span><br><span class="line"><span class="function">std::shared_ptr&lt;Widget&gt; <span class="title">spw2</span><span class="params">(<span class="keyword">new</span> Widget)</span></span>;</span><br></pre></td></tr></table></figure>
+<p>使用make系列函数只有一个Widget,代码风格不冗余。</p>
+<span id="more"></span>
+
+<h4 id="使用std-make-shared的理由-异常安全性"><a href="#使用std-make-shared的理由-异常安全性" class="headerlink" title="使用std::make_shared的理由:异常安全性"></a>使用std::make_shared的理由:异常安全性</h4><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">MyClass</span>&#123;&#125;;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">test1</span><span class="params">(std::shared_ptr&lt;MyClass&gt; share_p , <span class="type">int</span> count)</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">test2</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span></span>&#123;</span><br><span class="line">    <span class="built_in">test1</span>(std::<span class="built_in">shared_ptr</span>&lt;MyClass&gt;(<span class="keyword">new</span> MyClass),<span class="built_in">test2</span>());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>对于上面代码可能会造成内存泄漏.这和编译器从源代码到目标代码的翻译有关系<br>理想情况test1()运行前发生:</p>
+<ol>
+<li>“new MyClass”完成评估求值(在堆创建)</li>
+<li>new 出来的裸指针被shared_ptr托管(运行shared_ptr的构造函数)</li>
+<li>运行test2()<br>而编译器不必按照上述顺序生成代码.当然”new MyClass”必须在shared_ptr的构造函数调用前执行完,但是test2()并没有强制它的运行顺序,也就是说test2()可能在1和2的调用前,调用后,甚至1和2调用之间执行.你可能觉得无伤大雅,但是如果test2()在运行时产生了异常呢?<br>此时第一步动态分配的MyClass会被泄漏.</li>
+</ol>
+<h5 id="如何解决这个问题呢"><a href="#如何解决这个问题呢" class="headerlink" title="如何解决这个问题呢?"></a>如何解决这个问题呢?</h5><h6 id="分开写"><a href="#分开写" class="headerlink" title="分开写"></a>分开写</h6><p>没错,编译器分不清顺序,你就让它分清就好了,将单独的语句改写成多行</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">std::shared_ptr&lt;MyClass&gt; <span class="title">spw</span><span class="params">(<span class="keyword">new</span> MyClass,MyDel)</span></span>;<span class="comment">//MyDel是自定义析构器</span></span><br><span class="line"><span class="built_in">test1</span>(std::<span class="built_in">move</span>(spw),<span class="built_in">test2</span>());                  <span class="comment">//移动可以提高效率,并且防止复制对引用计数进行原子的递增操</span></span><br></pre></td></tr></table></figure>
+<h6 id="使用std-make-shared"><a href="#使用std-make-shared" class="headerlink" title="使用std::make_shared"></a>使用std::make_shared</h6><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="built_in">test1</span>(std::<span class="built_in">make_shared</span>&lt;MyClass&gt;(),<span class="built_in">test2</span>());</span><br></pre></td></tr></table></figure>
+<p>这里如果test2()先运行且异常,动态还没分配MyClass<br>如果先运行std::make_shared<MyClass>(),动态分配的裸指针会安全的存储在std::shared_ptr对象中,之后test2()异常也能正常析构<br>.<em>std::unique_ptr和std::make_unique同理</em></p>
+<h4 id="使用std-make-shared的另一个理由-性能提升"><a href="#使用std-make-shared的另一个理由-性能提升" class="headerlink" title="使用std::make_shared的另一个理由:性能提升"></a>使用std::make_shared的另一个理由:性能提升</h4><p>shared_ptr 直接使用 new 表达式的话,除了要为 MyClass 进行一次内存分配,还要为与其相关联的控制块再进行一次内存分配.<br>而使用make_shared来代替new表达式的话,仅仅需要一次内存分配.</p>
+<h4 id="make系列函数也不是万能的"><a href="#make系列函数也不是万能的" class="headerlink" title="make系列函数也不是万能的"></a>make系列函数也不是万能的</h4><p>说了这么多,make系列的函数无论是在异常安全,效率,避免代码冗余都有优势,但是不能排他性的只用make系列函数,因为有些情景下不能使用make系列函数.比如,自定义析构器,无法完美转发大括号初始化物,定义自身版本的operator new和operator delete(shared_ptr).<br>对于operator new和operator delete这种边缘情况就不做解释,知道有这么个东西就可以了.</p>
+<h5 id="自定义析构器"><a href="#自定义析构器" class="headerlink" title="自定义析构器"></a>自定义析构器</h5><p>所有的make系列函数不允许使用自定义析构器. std::unique_ptr 和 std::shared_ptr 却都有着允许使用自定义析构器的构造函数:</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">auto</span> MyDel = [](MyClass* pw) &#123;...&#125;;</span><br><span class="line"><span class="function">std::unique_ptr&lt;MyClass, <span class="title">decltype</span><span class="params">(MyDel)</span>&gt; <span class="title">upw</span><span class="params">(<span class="keyword">new</span> MyClass, MyDel)</span></span>;</span><br><span class="line"><span class="function">std::shared_ptr&lt;MyClass&gt; <span class="title">spw</span><span class="params">(<span class="keyword">new</span> MyClass, MyDel)</span></span>;  <span class="comment">// MyDel是自定义析构器</span></span><br><span class="line"><span class="built_in">test1</span>(std::<span class="built_in">move</span>(spw),<span class="built_in">test2</span>());  <span class="comment">// 移动可以提高效率,并且防止复制对引用计数进行原子的递增操</span></span><br></pre></td></tr></table></figure>
+<h5 id="不能完美转发大括号初始化物"><a href="#不能完美转发大括号初始化物" class="headerlink" title="不能完美转发大括号初始化物"></a>不能完美转发大括号初始化物</h5><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">auto</span> upv = std::make_unique&lt;std::vector&lt;<span class="type">int</span>&gt;&gt;(<span class="number">10</span>, <span class="number">20</span>);</span><br></pre></td></tr></table></figure>
+<p>最终upv指涉到的是一个包含10个元素,每个元素值都为20的vector?还是包含两个元素,分别是10,20的vector?但是不能完美转发大括号初始化物该怎么办?<br>答案是make系列的函数对形参进行完美转发的代码使用的是圆括号而非大括号.所以是一个包含10个元素,每个元素值都为20的vector.也不是不能完美转发,变通以下还是可以的.比如下面的test1()创建一个std::initializer_list对象,并且利用std::initializer_list型别的构造函数构造vector.</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="type">int</span> <span class="title">test1</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> upv =</span><br><span class="line">        std::make_unique&lt;std::vector&lt;<span class="type">int</span>&gt;&gt;(std::initializer_list&lt;<span class="type">int</span>&gt;&#123;<span class="number">10</span>, <span class="number">20</span>&#125;);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">auto</span> initlist = &#123;<span class="number">10</span>, <span class="number">20</span>&#125;;</span><br><span class="line">    <span class="keyword">auto</span> spv = std::make_shared&lt;std::vector&lt;<span class="type">int</span>&gt;&gt;(initlist);</span><br><span class="line"></span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;std::unique_ptr elements: &quot;</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; element : *upv) &#123;</span><br><span class="line">        std::cout &lt;&lt; element &lt;&lt; <span class="string">&quot; &quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    std::cout &lt;&lt; std::endl;</span><br><span class="line"></span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;std::shared_ptr elements: &quot;</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; element : *spv) &#123;</span><br><span class="line">        std::cout &lt;&lt; element &lt;&lt; <span class="string">&quot; &quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    std::cout &lt;&lt; std::endl;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">test2</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">auto</span> upv = std::make_unique&lt;std::vector&lt;<span class="type">int</span>&gt;&gt;(<span class="number">10</span>, <span class="number">20</span>);</span><br><span class="line">    <span class="keyword">auto</span> spv = std::make_shared&lt;std::vector&lt;<span class="type">int</span>&gt;&gt;(<span class="number">10</span>, <span class="number">20</span>);</span><br><span class="line"></span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;std::unique_ptr elements: &quot;</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; element : *upv) &#123;</span><br><span class="line">        std::cout &lt;&lt; element &lt;&lt; <span class="string">&quot; &quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    std::cout &lt;&lt; std::endl;</span><br><span class="line"></span><br><span class="line">    std::cout &lt;&lt; <span class="string">&quot;std::shared_ptr elements: &quot;</span>;</span><br><span class="line">    <span class="keyword">for</span> (<span class="type">const</span> <span class="keyword">auto</span>&amp; element : *spv) &#123;</span><br><span class="line">        std::cout &lt;&lt; element &lt;&lt; <span class="string">&quot; &quot;</span>;</span><br><span class="line">    &#125;</span><br><span class="line">    std::cout &lt;&lt; std::endl;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>依次运行test1()和test2()得到的结果是:</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">➜  tmp git:(main) ✗ ./tmp</span><br><span class="line">std::unique_ptr elements: 10 20 </span><br><span class="line">std::shared_ptr elements: 10 20 </span><br><span class="line">std::unique_ptr elements: 20 20 20 20 20 20 20 20 20 20 </span><br><span class="line">std::shared_ptr elements: 20 20 20 20 20 20 20 20 20 20</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">auto</span> initlist = &#123;<span class="number">10</span>, <span class="number">20</span>&#125;;</span><br><span class="line"><span class="keyword">auto</span> spv = std::make_shared&lt;std::vector&lt;<span class="type">int</span>&gt;&gt;(initlist);</span><br></pre></td></tr></table></figure>
+<p>对于test1()中upv和spv的初始化,我更希望能使用第二种,没有人会想写第一种那么复杂的代码的.示例代码仅仅展示auto推导出来的类型.</p>
+]]></content>
+      <tags>
+        <tag>c++</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>条款23：理解std::move 和 std::forward</title>
+    <url>/2023/10/09/%E6%9D%A1%E6%AC%BE23/</url>
+    <content><![CDATA[<h3 id="须知"><a href="#须知" class="headerlink" title="须知"></a>须知</h3><p><code>std::move</code> 不做任何移动， <code>std::forward</code> 不做任何转发。它们在运行的时候什么都没干。<br>它们两个都只做了<strong>强制类型转换</strong>，<code>std::move</code> 无条件将实参强制转换成右值，<code>std::forward</code> 是有条件的执行强制类型转换。</p>
+<span id="more"></span>
+<h3 id="std-move"><a href="#std-move" class="headerlink" title="std::move"></a>std::move</h3><p>我们来看一看<code>c++11</code>中std::move的示例实现:</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">typename</span> std::remove_reference&lt;T&gt;::<span class="function">type&amp;&amp; <span class="title">move</span><span class="params">(T&amp;&amp; param)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">using</span> ReturnType = <span class="keyword">typename</span> std::remove_reference&lt;T&gt;::type&amp;&amp;;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;ReturnType&gt;(param);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这里也和条款9呼应，也就是别名声明(<code>using</code>)压倒<code>typedef</code>的优势：支持模板化！而<code>typedef</code>需要结构体来辅助完成同样功能。如果我们要使用<code>typedef</code>来实现同样的功能的话，代码如下：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">struct</span> <span class="title class_">StructReturnType</span> &#123;</span><br><span class="line">    <span class="keyword">typedef</span> <span class="keyword">typename</span> std::remove_reference&lt;T&gt;::type&amp;&amp; type;</span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="keyword">typename</span> std::remove_reference&lt;T&gt;::<span class="function">type&amp;&amp; <span class="title">move</span><span class="params">(T&amp;&amp; param)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="keyword">static_cast</span>&lt;<span class="keyword">typename</span> StructReturnType&lt;T&gt;::type&gt;(param);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>如果是<code>c++14</code>，有了返回值型别推导，实现<code>std::move</code>就更加方便：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line"><span class="function"><span class="keyword">decltype</span>(<span class="keyword">auto</span>) <span class="title">move</span><span class="params">(T&amp;&amp; param)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">using</span> ReturnType = std::<span class="type">remove_reference_t</span>&lt;T&gt;&amp;&amp;;</span><br><span class="line">    <span class="keyword">return</span> <span class="built_in">static_cast</span>&lt;ReturnType&gt;(param);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="type">int</span> x = <span class="number">42</span>;</span><br><span class="line">    <span class="type">int</span>&amp; x_ref = x;</span><br><span class="line">    <span class="type">int</span>&amp;&amp; rvalue_ref_1 = <span class="built_in">move</span>(x);       <span class="comment">//编译通过，说明强制转换成功</span></span><br><span class="line">    <span class="type">int</span>&amp;&amp; rvalue_ref_2 = <span class="built_in">move</span>(x_ref);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p><code>std::move</code><strong>只做强制类型转换，不做移动</strong>。当然右值是可以实施移动的，所以一个对象实施了<code>std::move</code>后就告诉编译器该对象可能具备移动的条件。为什么是可能呢？通常情况下的确没有问题，具备移动的条件。看下面这个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span>&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Entity</span><span class="params">(std::string tmp)</span></span>;</span><br><span class="line">    <span class="comment">//...</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p>这里的<code>explicit</code> 是一个关键字，通常用于类的构造函数声明中，用于阻止隐式类型转换。当一个构造函数被标记为 <code>explicit</code> 时，它告诉编译器不要执行隐式类型转换，只有显式调用时才会使用该构造函数。</p>
+<p><code>Entity</code>类的构造函数不需要修改<code>tmp</code>，根据优良传统“只要有可能使用<code>const</code>就使用”，将代码更改成了下面的形式：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span>&#123;</span><br><span class="line"><span class="keyword">private</span>:</span><br><span class="line">    std::string value;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="keyword">explicit</span> <span class="title">Entity</span><span class="params">(<span class="type">const</span> std::string tmp)</span></span></span><br><span class="line"><span class="function">    : value(std::move(tmp))&#123;</span>&#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>代码顺利运行，但是<code>tmp</code>是被复制近<code>value</code>的，而不是移动。<code>std::move(tmp)</code>后结果是右值<code>const std::string</code>，常量性保留下来了。<br>可以浅浅的看一下string的头文件:</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">   <span class="comment">//string 文件</span></span><br><span class="line">   <span class="keyword">using</span> string    = basic_string&lt;<span class="type">char</span>&gt;;</span><br><span class="line"></span><br><span class="line">   <span class="comment">//basic_string.h 文件</span></span><br><span class="line"></span><br><span class="line">   <span class="comment">//复制构造函数</span></span><br><span class="line">   <span class="built_in">basic_string</span>(<span class="type">const</span> basic_string&amp; __str)</span><br><span class="line">     : _M_dataplus(_M_local_data(),</span><br><span class="line">	    _Alloc_traits::_S_select_on_copy(__str._M_get_allocator()))</span><br><span class="line">     &#123;</span><br><span class="line">_M_construct(__str._M_data(), __str._M_data() + __str.<span class="built_in">length</span>(),</span><br><span class="line">	     std::forward_iterator_tag());</span><br><span class="line">     &#125;</span><br><span class="line">   </span><br><span class="line">   <span class="comment">//移动构造函数</span></span><br><span class="line">   <span class="built_in">basic_string</span>(basic_string&amp;&amp; __str) <span class="keyword">noexcept</span></span><br><span class="line">     : _M_dataplus(_M_local_data(), std::<span class="built_in">move</span>(__str._M_get_allocator()))</span><br><span class="line">     &#123;</span><br><span class="line"><span class="keyword">if</span> (__str._M_is_local())</span><br><span class="line">  &#123;</span><br><span class="line">    traits_type::<span class="built_in">copy</span>(_M_local_buf, __str._M_local_buf,</span><br><span class="line">		      __str.<span class="built_in">length</span>() + <span class="number">1</span>);</span><br><span class="line">  &#125;</span><br><span class="line"><span class="keyword">else</span></span><br><span class="line">  &#123;</span><br><span class="line">    _M_data(__str._M_data());</span><br><span class="line">    _M_capacity(__str._M_allocated_capacity);</span><br><span class="line">  &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// Must use _M_length() here not _M_set_length() because</span></span><br><span class="line"><span class="comment">// basic_stringbuf relies on writing into unallocated capacity so</span></span><br><span class="line"><span class="comment">// we mess up the contents if we put a &#x27;\0&#x27; in the string.</span></span><br><span class="line">_M_length(__str.<span class="built_in">length</span>());</span><br><span class="line">__str._M_data(__str._M_local_data());</span><br><span class="line">__str._M_set_length(<span class="number">0</span>);</span><br><span class="line">     &#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到移动构造的函数只能接受非常量的<code>string</code>类型的右值引用作为形参。因为指涉到常量的左值引用允许绑定在一个常量右值性别的形参，最终调用的是<code>string</code>的复制构造函数（即使tmp为右值）。</p>
+<p>通过这个例子，我们可以学习到：</p>
+<ul>
+<li>如果想取得对某个对象执行移动操作的能力，不要将其声明为常量。</li>
+<li><code>std::move</code>不能保证强制型别转换的对象具备可移动的能力。</li>
+<li>唯一可以确定的，结果是个右值。</li>
+</ul>
+<h3 id="std-forward"><a href="#std-forward" class="headerlink" title="std::forward"></a>std::forward</h3><p>需要注意的是：传递给 std::forward 的实参型别应当是个非引用型别,因为习惯上它编码的所传递<br>实参应该是个右值(参见条款 28)。<br><code>std::forward</code> 仅仅在特定情况下会实施强制类型转换。最常见的就是某个函数模板取用了万能引用型别作为形参，传递给另一个函数,如下：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">func</span><span class="params">(<span class="type">const</span> Entity&amp; left)</span></span>;</span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">func</span><span class="params">(Entity&amp;&amp; right)</span></span>;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">func2</span><span class="params">(T&amp;&amp; param)</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="built_in">func</span>(param);</span><br><span class="line">    <span class="built_in">func</span>(std::forward&lt;T&gt;(param));</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#123;</span><br><span class="line">    <span class="function">std::string <span class="title">str</span><span class="params">(<span class="string">&quot;hello&quot;</span>)</span></span>;</span><br><span class="line">    <span class="function">Entity <span class="title">e</span><span class="params">(str)</span></span>;</span><br><span class="line">    <span class="built_in">func2</span>(e);</span><br><span class="line">    <span class="built_in">func2</span>(std::<span class="built_in">move</span>(e));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>我们希望<code>func2</code>传入的是一个左值时，执行<code>func</code>的左值的版本，传入的是个右值的时候执行<code>func</code>重载的右值的版本。但是函数形参都是左值，也就是说这里的<code>param</code>一直是左值，不论传入<code>func2</code>的是左值还是右值，都只会执行<code>func</code>的左值版本。此时，<code>std::forward</code>就做到了这件事：仅当实参是右值完成初始化的时候才会执行向右值的强制类型转换。</p>
+<p>那么<code>std::forward</code>是如何知道实参是否通过右值来完成初始化的呢？其实是通过传入的函数模板形参<code>T</code>来实现的(详细参见条款 28)。</p>
+]]></content>
+      <tags>
+        <tag>c++</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>条款24:区分万能引用和右值引用</title>
+    <url>/2023/10/12/%E6%9D%A1%E6%AC%BE24/</url>
+    <content><![CDATA[<h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>不是所有的<code>&amp;&amp;</code>都是右值引用！</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span> <span class="params">(Widget&amp;&amp; param)</span></span>;    <span class="comment">// 右值引用</span></span><br><span class="line">Widget&amp;&amp; varl = <span class="built_in">Widget</span>();   <span class="comment">// 右值引用</span></span><br><span class="line"><span class="keyword">auto</span>&amp;&amp; var2 = van;          <span class="comment">// 不是右值引用</span></span><br><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">(std: :vector&lt;T&gt;&amp;&amp; param)</span></span>;    <span class="comment">// 右值引用</span></span><br><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">(T&amp;&amp; param)</span></span>;          <span class="comment">// 不是右值引用</span></span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<span id="more"></span>
+
+<p>好了，看完CPU烧了，到底是不是右值引用呀，我也不知道呀。<br>实际上, “ <code>T&amp;&amp;</code> ”有两种不同的含义。其中一种含义,理所当然,是右值引用。正如期望,它们仅仅会绑定到右值,而其主要的存在理由,在于识别出可移对象。“ <code>T&amp;&amp;</code> “的另一种含义,则表示其既可以是右值引用,亦可以是左值引用。它可以绑定到右值，也可以像左值引用一样，也可以绑定在<code>const</code>对象或者非<code>const</code>对象，也可以绑定在<code>volatile</code>对象或者非<code>volatile</code>对象,它灵活度高到被成为<em>万能引用</em>。</p>
+<h3 id="万能引用的场景"><a href="#万能引用的场景" class="headerlink" title="万能引用的场景"></a>万能引用的场景</h3><ol>
+<li>函数模板的推导</li>
+<li>auto声明</li>
+</ol>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">auto</span>&amp;&amp; var2 = van;          <span class="comment">// 不是右值引用</span></span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">(T&amp;&amp; param)</span></span>;          <span class="comment">// 不是右值引用</span></span><br><span class="line"><span class="comment">//在这种情况下，类型 T 是需要从参数中推导的，因为 param 的类型是未知的，这时编译器将根据参数类型来推导 T 的类型。</span></span><br></pre></td></tr></table></figure>
+<p>这两个场景的共同之处：都涉及<strong>型别推导</strong>。如果看到了<code>T&amp;&amp;</code>但是没有型别推导，那么就可以确定是右值引用。</p>
+<h3 id="万能引用的条件"><a href="#万能引用的条件" class="headerlink" title="万能引用的条件"></a>万能引用的条件</h3><p>万能引用的特点是它们具有两个条件：</p>
+<ol>
+<li><p><strong>必须</strong>在模板内进行型别推导：这意味着类型 T 必须在模板函数或模板类内部通过类型推导而不是显式指定。这是因为模板会根据实际传递给函数或类的参数类型来推导 T 的类型。</p>
+</li>
+<li><p>型别声明的形式<strong>必须</strong>是 <code>T&amp;&amp;</code>：这表示右值引用的声明必须以 T&amp;&amp; 的形式出现，以指示它可以成为万能引用。</p>
+</li>
+</ol>
+<p>如果这两个条件同时满足，那么右值引用就被认为是万能引用。</p>
+<p>这也就是为什么上面提到的<code>void f(std: :vector&lt;T&gt;&amp;&amp; param);</code>是右值引用而不是万能引用。它虽然涉及型别推导，但它的型别声明形式不是 <code>T&amp;&amp;</code>，而是 <code>std::vector&lt;T&gt;&amp;&amp;</code>。因此，这只是一个右值引用，而不是万能引用。</p>
+<p>即使只是一个<code>const</code>的存在，也不满足条件2,就成为了右值引用。</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">template</span>&lt;<span class="keyword">typename</span> T&gt;</span></span><br><span class="line"><span class="function"><span class="type">void</span> <span class="title">f</span><span class="params">(<span class="type">const</span> T&amp;&amp; param)</span></span>;    <span class="comment">//右值引用</span></span><br></pre></td></tr></table></figure>
+
+<p>如果在一个模板内看到一个函数形参为<code>T&amp;&amp;</code>也不能想当然的认为它是万能引用。看下面的例子</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">using</span> <span class="keyword">namespace</span> std;</span><br><span class="line"><span class="keyword">template</span>&lt;<span class="keyword">class</span> <span class="title class_">T</span> , <span class="keyword">class</span> <span class="title class_">Allocator</span> = allocator&lt;T&gt;&gt;</span><br><span class="line"><span class="keyword">class</span> vector&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="type">void</span> <span class="built_in">push_back</span>(T&amp;&amp; x);</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+
+<p><code>push_back</code>的形参满足条件，但是条件一：型别推导，它并没有涉及。因为该函数作为<code>vector</code>类的一部分，如果没有特定<code>vector</code>类实例，就没有该函数（C++类的基础）。如果给定一个<code>vector</code>实例，那么<code>push_back</code>的形参就会被具体化。比如给定一个实例:</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">std::vector&lt;Entity&gt; entity;</span><br></pre></td></tr></table></figure>
+<p>vector模板就会被具化为：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">vector</span>&lt;Entity, allocator&lt;Entity&gt;&gt;&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">push_back</span><span class="params">(Entity&amp;&amp; x)</span></span>;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>可以看到，<code>push_back</code>函数并没有涉及类型推导。因此其参数不是万能引用。</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">template</span>&lt;<span class="keyword">class</span> <span class="title class_">T</span> , <span class="keyword">class</span> <span class="title class_">Allocator</span> = allocator&lt;T&gt;&gt;</span><br><span class="line"><span class="keyword">class</span> vector&#123;</span><br><span class="line"><span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span>&lt;<span class="keyword">class</span>... Args&gt;</span><br><span class="line">    <span class="type">void</span> <span class="built_in">emplace_back</span>(Args&amp;&amp;... args);  <span class="comment">// 万能引用</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+<p>这里的<code>args</code>涉及到了类型推导，因此是万能引用。</p>
+<h4 id="多说一点"><a href="#多说一点" class="headerlink" title="多说一点"></a>多说一点</h4><p>有些人不清楚<code>template&lt;class... Args&gt;</code>中的<code>...</code>是什么，其实很简单，”…” 是用来表示可变参数模板的语法。它用于表示函数或类模板可以接受可变数量的参数。具体来说，<code>Args</code> 是一个参数包，它可以包含零个或多个模板参数。<code>Args&amp;&amp;... args</code> 表示您可以将任意数量的参数传递给 <code>emplace_back</code> 函数，每个参数都会被表示为 <code>Args</code> 类型的右值引用。这种语法通常用于实现”完美转发”。（后面会提到）</p>
+<p>而前面提到的另一种场景,auto声明，在<code>C++11</code>中不怎么普遍。而在<code>C++14</code>中，它现身的机会就更多了，因为<code>C++14</code>中的<code>lambda</code>表达式中可以声明<code>auto&amp;&amp; </code>的形参。</p>
+<h3 id="万能引用的作用"><a href="#万能引用的作用" class="headerlink" title="万能引用的作用"></a>万能引用的作用</h3><p>这种引用在模板编程中非常有用，因为它们能够保持对传递给它们的参数的左值或右值性质，并且可以实现完美转发，使它们适用于各种不同类型的参数。</p>
+]]></content>
+      <tags>
+        <tag>c++</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>条款25:针对右值引用实施std::move，针对万能引用实施std::forward</title>
+    <url>/2023/10/12/%E6%9D%A1%E6%AC%BE25/</url>
+    <content><![CDATA[<h3 id="重载？"><a href="#重载？" class="headerlink" title="重载？"></a>重载？</h3><p>在条款23的基础上，再来细说一下<code>std::move</code>和<code>std::forward</code>。看这个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::<span class="built_in">move</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看着好像一切安好。<span id="more"></span>注意这里的<code>n</code>是局部变量，传递给<code>e.setName()</code>，调用者假定该函数对<code>n</code>只进行读操作是没有任何问题的。但是<code>setName()</code>内部使用了<code>std::move</code>将其引用的形参无条件强转成右值，因此<code>n</code>的数值就会被移入<code>e.name</code>。运行完<code>setName()</code>后，<code>n</code>就成了一个未知数。</p>
+<p>你会说：那我为啥要把形参声明称万能引用自讨苦吃，我直接为其分别重载左值和右值两个版本不就好了。你说的对，但是对的很难受。程序运行效率降低是其次，最主要的是代码难以维护以及扩展性太差。</p>
+<p>这个例子只有一个形参，还好处理，两个重载版本就行了。那么10个参数的呢？难不成你重载 (2^{10}) 个版本？有啥想不开的非要这么折磨自己。更别说有些函数模板会有无穷多个形参（比如：<code>std::make_shared</code>）</p>
+<h3 id="万能引用！"><a href="#万能引用！" class="headerlink" title="万能引用！"></a>万能引用！</h3><p>上面的例子修改如下，这样就不需要重载也能实现对应功能了：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::forward&lt;T&gt;(newName); <span class="comment">// 使用 std::forward 来保持左值或右值性质</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;NewName&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="需要注意的点"><a href="#需要注意的点" class="headerlink" title="需要注意的点"></a>需要注意的点</h3><p>假设在某个函数中，你刚开始只用了一次该对<br>象，之后就对其实施<code>std::move</code>或者<code>std::forward</code>，这没有问题，需要注意的是，随着函数不断完善，如果在该函数中不止一次地绑定到右值引用或者万能引用，就会导致上面变量<code>n</code>就成了一个未知数的错误。因此，在这种情况下，只能在最后一次使用该引用的时候对其实施<code>std::move</code>或者<code>std::forward</code>来确保其他操作时候其值依旧存在。</p>
+<h3 id="std-move-if-noexcept"><a href="#std-move-if-noexcept" class="headerlink" title="std::move_if_noexcept"></a>std::move_if_noexcept</h3><p><code>std::move_if_noexcept</code> 通常用于优化移动操作，特别是在异常安全性方面。它可以帮助在一些情况下，当移动操作不会抛出异常时，避免不必要的拷贝。</p>
+<p>这个函数的典型用例是在容器类的 <code>emplace_back</code> 和 <code>emplace</code> 成员函数中，这些函数通常要求插入元素时提供的参数（构造元素的参数）不会抛出异常。这样可以确保在插入元素时，如果构造过程抛出异常，容器的状态不会受到破坏，因为元素的构造是在容器内完成的。</p>
+<p>考虑以下示例，使用 <code>std::move_if_noexcept</code> 在 <code>emplace_back</code> 中：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">std::vector&lt;MyType&gt; myVector;</span><br><span class="line">myVector.<span class="built_in">emplace_back</span>(std::<span class="built_in">move_if_noexcept</span>(someValue));</span><br></pre></td></tr></table></figure>
+
+<p>在这里，<code>std::move_if_noexcept</code> 会检查 <code>someValue</code> 是否可以进行无异常移动，如果可以，它会使用移动操作，否则会进行拷贝操作。这有助于确保异常安全性，以避免在构造元素时抛出异常时，不会破坏容器的状态。</p>
+<p>要使用 <code>std::move_if_noexcept</code>，您需要确保在需要优化移动操作的情况下，并且对于元素类型的移动构造函数声明了 <code>noexcept</code> 说明符。这通常是在实现自定义类时要考虑的事情。</p>
+<p>总之，<code>std::move_if_noexcept</code> 是一种有助于提高性能并确保异常安全性的工具，但需要在适当的情况下使用它。</p>
+<h3 id="局部对象可能适用于返回值优化"><a href="#局部对象可能适用于返回值优化" class="headerlink" title="局部对象可能适用于返回值优化"></a>局部对象可能适用于返回值优化</h3><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 复制版本</span></span></span><br><span class="line"><span class="function"> </span>&#123;</span><br><span class="line">    Widget w;           <span class="comment">// 局部变量</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> w;           <span class="comment">// 将w&quot;复制&quot;入返回值</span></span><br><span class="line"> &#125;</span><br><span class="line"><span class="comment">// 将&quot;复制&quot;转换为移动来进行优化？</span></span><br><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 移动版本</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Widget w;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> std::<span class="built_in">move</span>(w);   <span class="comment">//将w移入返回值，不能这样做！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>很不幸，这样是不正确的。因为先人就是这样规定的。开个玩笑，因为先人已经比我们领先很多年想到并且解决了这里的优化问题。也就是熟知的RVO(返回值优化)。</p>
+<p>编译器如果要在一个桉之返回的函数里忽略对局部对象的复制（或移动），需要满足两个条件：</p>
+<ol>
+<li>局部对象和返回值性别相同</li>
+<li>返回的就是局部对象本身</li>
+</ol>
+<p>我们现在往上看“复制版本”的函数，两个条件均满足，所以进行返回值优化，实质上该函数并没有复制任何东西。而移动版本的函数不满足第二个规定，返回的不是本身而是引用，并没有优化，编译器就把返回值<code>w</code>移入函数的返回值存储的位置。<code>RVO</code>的那条福音后面又接着说明,即使实施<code>RVO</code>的前提条件满足,但编译器选择不执行复制省略的时候,返回对象必须作为右值处理。这么一来,就等于标准要求:当<code>RVO</code>的前提条件允许时,要么发生复制省略,要么<code>std:: move</code>隐式地被实施于返回的局部对象上。因此，上面的例子中复制版本的函数就可能被编译器优化成移动的版本。</p>
+<p>既然如此，就不要使用<code>std::move</code>或者<code>std::forward</code>来对可能适用于优化的局部对象处理。防止排除编译器<code>RVO</code>的实施机会。</p>
+]]></content>
+      <tags>
+        <tag>c++</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>硬件控制器端口</title>
+    <url>/2024/01/17/%E7%A1%AC%E4%BB%B6%E6%8E%A7%E5%88%B6%E5%99%A8%E7%AB%AF%E5%8F%A3-md/</url>
+    <content><![CDATA[<p>哎！当时懒得记笔记，到头来还是得重新回头翻书看，这次顺带把笔记做上。</p>
+<h2 id="CHS-和-LBA"><a href="#CHS-和-LBA" class="headerlink" title="CHS 和 LBA"></a>CHS 和 LBA</h2><p>早期的时候计算机是通过CHS寻址模式来定位区块的，但是弊端也很明显，区块必须将指定硬盘的柱面（Cylinder）&#x2F;磁头(Head)&#x2F;扇区（Sector）三个参数来定位一个唯一的扇区地址，这套逻辑只有在硬盘操作内部有用，其他设备想要访问的话需要额外知道这些细节数据，太麻烦了，于是LBA应运而生。LBA十分单纯，从0开始定位区块，第一个区块的LBA&#x3D;0，第二个区块的LBA&#x3D;1，以此类推，LBA取代了CHS，这样就能以一种相对而言更方便的方式来进行硬盘IO。但是LBA只是在CHS上进行了抽象，实际上的硬件控制器还是需要CHS来进行寻址的，但是我们现在使用LBA给传入的是 0 1 2 3 之类的数字，硬件控制器又该如何通过LBA转换成正确的CHS呢？</p>
+<span id="more"></span>
+<h3 id="CHS-和-LBA-的相互转换"><a href="#CHS-和-LBA-的相互转换" class="headerlink" title="CHS 和 LBA 的相互转换"></a>CHS 和 LBA 的相互转换</h3><p>CHS地址可用以下公式转成LBA,</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">#c、#h、#s分别是磁柱、磁头、扇区的编号</span><br><span class="line">#lba是逻辑区块编号</span><br><span class="line">H=heads per cylinder，每个磁柱的磁头数</span><br><span class="line">S=sectors per track，每磁道的扇区数</span><br><span class="line">#lba=(#c*H+#h)*S+#s-1</span><br></pre></td></tr></table></figure>
+<hr>
+<p>LBA可用以下公式对应到CHS:</p>
+<p>#c&#x3D;#lba&#x2F;(S*H)<br>#h&#x3D;(#lba&#x2F;S)%H<br>#s&#x3D;(#lba%S)+1<br>其中,</p>
+<p>\SHU&#x2F; 是整数除法<br>% 是取整数除法中的余数<br>请注意，当今的磁盘使用ZBR(Zone Bit Recording, 等密度记录)方式，实际的每轨扇区数得根据它是哪一轨。不过磁盘还是会提供这个参数来符合公式，内部再自动调整。</p>
+<h4 id="ZBR又是个啥玩意"><a href="#ZBR又是个啥玩意" class="headerlink" title="ZBR又是个啥玩意"></a>ZBR又是个啥玩意</h4><p>首先我们都知道每个磁道上又划分出了多个区域，每个区域叫做扇区，并且每个扇区的大小是固定的 512 字节。读取数据的时候，只需要通过这个划分就能够知道数据在哪个磁道、哪个扇区了。但是有一个问题，那就是不同的磁道扇区数是相同的，扇区所在的磁道半径约大，则扇区的面积就越大。但无论面积比靠内磁道的扇区大多少，按照设计、规定只能存储 512 字节的数据，这样一来会浪费大量的存储空间。</p>
+<p>ZBR就是解决这个问题的，简单说就是以前的标准外层和内层的扇区数量是固定的，你想想，外层是不是利用效率下降了，就提出来ZBR方案，外层的磁道扇区数量给分多点，让每个空间都能被利用到，提高磁盘的利用空间。<strong>实际的每轨扇区数得根据它是哪一轨。不过磁盘还是会提供这个参数来符合公式，内部再自动调整。</strong></p>
+<p>其它公式:<br>#lba&#x2F;S&#x3D;q % r<br>#s&#x3D;1+r<br>q&#x2F;H&#x3D;#c % h<br>例如:</p>
+<p>CHS总数&#x3D;[600, 10, 84]，求#lba&#x3D;1234所对应的CHS编号:<br>1234&#x2F;84&#x3D;14 余 58<br>#s&#x3D;1+58&#x3D;59<br>14&#x2F;10&#x3D;1 余 4<br>#c&#x3D;1<br>#h&#x3D;4<br>#chs&#x3D;(1, 4, 59)<br>验算: <code>(1*10+4)*84+59-1=14*84+58=1234</code></p>
+<p>目前主要有的是：LBA28和LBA48。LBA28就是使用28位比特来描述一个扇区的地址，最大寻址有2的28次方个扇区。每个扇区有512字节，计算可得最大支持128GB，128GB明显不够现在使用，LBA48也是同理，感兴趣的可以计算一下LBA48最大寻址有多少TB。</p>
+<h2 id="通道和主从盘"><a href="#通道和主从盘" class="headerlink" title="通道和主从盘"></a>通道和主从盘</h2><p>通常情况下，一个主板支持4块IDE（PATA接口）硬盘，所以主板上提供了两个IDE插槽，这两个接口分别是：IDE0和IDE1。这两个接口被成为通道,IDE0叫做<code>Primary</code>通道,IDE1叫做<code>Secondary</code>通道。SATA硬盘也兼容PATA的编程接口。这里每个通道分别主盘和从盘。</p>
+<h2 id="端口控制器主要端口寄存器"><a href="#端口控制器主要端口寄存器" class="headerlink" title="端口控制器主要端口寄存器"></a>端口控制器主要端口寄存器</h2><p>先说主要流程:</p>
+<ol>
+<li>先判断自己要处理哪个通道的硬盘。<code>Primary</code>通道用<code>0x1fx</code>接口,<code>Secondary</code>通道用<code>0x17x</code>接口。</li>
+<li>判断自己处理主盘还是从盘?读操作或者写操作?</li>
+<li>后续具体的LBA地址,操作扇区数量等下面会详细说明。</li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; eax 起始的逻辑扇区号</span><br><span class="line">; bx 读取到内存的具体地址</span><br><span class="line">; cx 总读取的扇区数</span><br><span class="line">rd_disk_16:</span><br><span class="line">    mov esi,eax</span><br><span class="line">    mov di,cx</span><br><span class="line">    mov ax,cx</span><br><span class="line"></span><br><span class="line">    ; 0x1f2 给传入需要读取的扇区数量</span><br><span class="line">    mov dx,0x1f2</span><br><span class="line">    out dx,al</span><br><span class="line">    mov cl,8</span><br><span class="line">    mov eax,esi</span><br><span class="line">    ; 3 ~ 5 是LBA地址的部分</span><br><span class="line">    mov dx,0x1f3</span><br><span class="line">    out dx,al</span><br><span class="line"></span><br><span class="line">    shr eax,cl</span><br><span class="line">    mov dx,0x1f4</span><br><span class="line">    out dx,al</span><br><span class="line"></span><br><span class="line">    shr eax,cl</span><br><span class="line">    mov dx,0x1f5</span><br><span class="line">    out dx,al</span><br><span class="line">    shr eax,cl</span><br><span class="line">    ; 这里是为了保存LBA地址</span><br><span class="line">    and al,0x0f</span><br><span class="line">    ; 设置属性</span><br><span class="line">    or al,0xe0</span><br><span class="line">    mov dx,0x1f6</span><br><span class="line">    out dx,al</span><br><span class="line">    </span><br><span class="line">    ; 读命令</span><br><span class="line">    mov al,0x20</span><br><span class="line">    mov dx,0x1f7</span><br><span class="line">    out dx,al</span><br><span class="line">.readying:</span><br><span class="line">    nop</span><br><span class="line">    in al, dx</span><br><span class="line">    test al, 0x80 ; 检查状态寄存器的 bsy 位</span><br><span class="line">    jnz .readying ; 如果 bsy 位为 1，等待磁盘准备好</span><br><span class="line">    ; 获取需要读取多少次,一次一个字所以是512 / 2</span><br><span class="line">    mov ax,di</span><br><span class="line">    mov dx,256</span><br><span class="line">    mul dx</span><br><span class="line">    mov ecx,0</span><br><span class="line">    mov cx,ax</span><br><span class="line">    mov dx,0x1f0</span><br><span class="line">.for_memory:</span><br><span class="line">    in ax,dx</span><br><span class="line">    mov [bx],ax</span><br><span class="line">    add bx,2</span><br><span class="line">    loop .for_memory</span><br><span class="line"></span><br><span class="line">.error:</span><br><span class="line">    ; 错误处理</span><br><span class="line">    ; 根据错误类型进行处理</span><br><span class="line">    ret</span><br></pre></td></tr></table></figure>
+<p>写一半懒得写了,赶进度,等有时间回来细写…</p>
+]]></content>
+      <tags>
+        <tag>真相还原</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>运算符优先级</title>
+    <url>/2023/10/11/%E8%BF%90%E7%AE%97%E7%AC%A6%E4%BC%98%E5%85%88%E7%BA%A7/</url>
+    <content><![CDATA[<h3 id="运算符优先级的问题"><a href="#运算符优先级的问题" class="headerlink" title="运算符优先级的问题"></a>运算符优先级的问题</h3><p>假如有下面的代码。<span id="more"></span>你想在特定条件下让 <code>high</code>变量的二进制形式左移四位然后加上&#96;low&#96;&#96;:</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; tmp)&#123;</span><br><span class="line">    num1 = high&lt;&lt;<span class="number">4</span> + low;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>或许你会为了代码可读性，将其更改成下面的格式：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; tmp != <span class="number">0</span>) &#123;</span><br><span class="line">    num1 = high&lt;&lt;<span class="number">4</span> + low;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>很不幸的是，这两个 <code>if</code>语句不能画上等号,因为你没有考虑到运算符优先级的问题，下面的语句实际上是：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; (tmp != <span class="number">0</span>)) &#123;</span><br><span class="line">    num1 = high&lt;&lt;(<span class="number">4</span> + low);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="运算符优先级规则"><a href="#运算符优先级规则" class="headerlink" title="运算符优先级规则"></a>运算符优先级规则</h3><p>是不是与你预想的差之千里，为了更好的使用 C 语言，每个 C coder 都应该牢记下面的几点:</p>
+<ul>
+<li>优先级最高的不是真正意义上的运算符。eg：数组下表、函数调用操作符、各结构成员选择操作符。它们都是自左向右结合的，这也就是为什么 <code>a.b.c</code>的含义是<code>(a.b).c</code>而不是 <code>a.(b.c)</code>。</li>
+<li>单目运算符（概念不清楚就搜一下）的优先级仅次于前述运算符（<code>++</code>运算符 <code>--</code>运算符）。<br>上一条也说了：函数调用操作符是优先级最高的。假如<code>p</code>是一个函数指针，我想通过这个指针来调用对应的函数，那么<code>*p()</code>显而易见错了，因为它会被编译器理解成<code>*(p())</code>，而我想要的效果是 <code>(*p)()</code>。<br>再举个关于前述运算符的例子。<code>*p++</code>，它会被编译器理解成<code>*(p++)</code>，而希望的效果是<code>(*p)++</code>。</li>
+<li>比单目运算符优先级低的就是双目运算符了。双目运算符中：算术运算符&gt;移位运算符&gt;关系运算符&gt;逻辑运算符&gt;赋值运算符&gt;条件运算符（三目运算符）。<br>这一条中最重要的几个点就是：</li>
+</ul>
+<ol>
+<li>任何一个逻辑运算符的优先级都要低于任何一个关系运算符。</li>
+<li>移位运算符的优先级比算术运算符低，但是高于关系运算符。</li>
+<li>6 个关系运算符的优先级不同。其中<code>==</code> 和 <code>!=</code> 优先级低于其他关系运算符的优先级。</li>
+<li>逻辑运算符中。按位运算符优先级高于顺序运算符。每个“与”运算符优先级高于对应的“或”运算符。异或运算符介于按位与运算符和按位或运算符之间。</li>
+<li>所有的赋值运算符优先级都是一样的（右 -&gt; 左）。eg：<code>a = b = 0;</code> 就是将 <code>a,b</code>赋值为 0。</li>
+<li>逗号运算符的优先级最低。<br>例子是举不完，记住这几条结论，在敲代码的时候多留意运算符优先级的问题，用的多了自然就熟练了。<br>也有个偷巧的方法：疯狂加括号，你想让谁先运行就给谁加括号，但是这样不好，会让代码看起来臃肿，不推荐。</li>
+</ol>
+]]></content>
+      <tags>
+        <tag>C语言</tag>
+      </tags>
+  </entry>
+</search>
