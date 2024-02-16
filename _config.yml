@@ -105,8 +105,8 @@ theme: next
 ## Docs: https://hexo.io/docs/one-command-deployment
 deploy:
   type: git
-  repository: https://github.com/zhendewokusi/zhendewokusi.github.io
-  branch: master
+  repository: https://github.com/zhendewokusi/Blog
+  branch: gh-pages
   plugins: -hexo-generator-feed
 
 
