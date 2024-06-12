@@ -1,7 +1,7 @@
 ---
 title: bochs安装教程
 date: 2024-01-17 19:49:39
-tags: [bochs] [真相还原]
+tags: [bochs, 真相还原]
 ---
 
 
