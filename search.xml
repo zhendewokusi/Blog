@@ -48,7 +48,7 @@
   </entry>
   <entry>
     <title>DPL CPL RPL 门</title>
-    <url>/2024/02/04/DPL-CPL-RPL/</url>
+    <url>/2024/02/03/DPL-CPL-RPL/</url>
     <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><ul>
 <li>实验环境:Archlinux + Bochs x86 Emulator 2.7</li>
 <li>编译器: nasm</li>
@@ -302,6 +302,24 @@
       </tags>
   </entry>
   <entry>
+    <title>bochs安装教程</title>
+    <url>/2024/01/17/bochs%E5%AE%89%E8%A3%85%E6%95%99%E7%A8%8B/</url>
+    <content><![CDATA[<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br><span class="line">CONFIGURE_ARGS=&quot;--enable-debugger --enable-readline&quot;</span><br></pre></td></tr></table></figure>
+
+<p>先改<code>.conf.linux</code>，里面的</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br></pre></td></tr></table></figure>
+
+<p>再使用：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">sh .conf.linux </span><br></pre></td></tr></table></figure>
+<p>然后在Makefile里面操作:</p>
+<p>我是在vscode中,Ctrl+F，将所有的<code>bochs</code>更改成<code>bochs_gdb</code>，接着将<code>bochs_gdb.h</code>更改为<code>bochs.h</code>,<code>wxbochs_gdb.rc</code>更改为<code>wxbochs.rc</code>，后面这个应该没影响，是和win有关系的，但是保险起见还是改了吧，然后进行<code>make -j16 &amp;&amp; sudo make install</code>。</p>
+]]></content>
+      <tags>
+        <tag>真相还原</tag>
+        <tag>bochs</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>TCP 超时计时器的管理</title>
     <url>/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/</url>
     <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
@@ -351,24 +369,6 @@
 ]]></content>
       <tags>
         <tag>TCP</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>bochs安装教程</title>
-    <url>/2024/01/17/bochs%E5%AE%89%E8%A3%85%E6%95%99%E7%A8%8B/</url>
-    <content><![CDATA[<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br><span class="line">CONFIGURE_ARGS=&quot;--enable-debugger --enable-readline&quot;</span><br></pre></td></tr></table></figure>
-
-<p>先改<code>.conf.linux</code>，里面的</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br></pre></td></tr></table></figure>
-
-<p>再使用：</p>
-<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">sh .conf.linux </span><br></pre></td></tr></table></figure>
-<p>然后在Makefile里面操作:</p>
-<p>我是在vscode中,Ctrl+F，将所有的<code>bochs</code>更改成<code>bochs_gdb</code>，接着将<code>bochs_gdb.h</code>更改为<code>bochs.h</code>,<code>wxbochs_gdb.rc</code>更改为<code>wxbochs.rc</code>，后面这个应该没影响，是和win有关系的，但是保险起见还是改了吧，然后进行<code>make -j16 &amp;&amp; sudo make install</code>。</p>
-]]></content>
-      <tags>
-        <tag>真相还原</tag>
-        <tag>bochs</tag>
       </tags>
   </entry>
   <entry>
@@ -958,7 +958,7 @@
   </entry>
   <entry>
     <title>指针和数组</title>
-    <url>/2023/10/11/%E6%8C%87%E9%92%88%E5%92%8C%E6%95%B0%E7%BB%84/</url>
+    <url>/2023/10/10/%E6%8C%87%E9%92%88%E5%92%8C%E6%95%B0%E7%BB%84/</url>
     <content><![CDATA[<h3 id="指针和数组"><a href="#指针和数组" class="headerlink" title="指针和数组"></a>指针和数组</h3><p>C 语言中指针和数组这两个概念密不可分，以至于如果没有理解其中一个概念，就无法彻底理解另一个概念。</p>
 <h4 id="数组"><a href="#数组" class="headerlink" title="数组"></a>数组</h4><p>很基础的一些知识点我就不重复了。关于数组，需要注意的有两个点：</p>
 <ol>
