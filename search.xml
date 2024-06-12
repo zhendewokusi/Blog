@@ -354,6 +354,24 @@
       </tags>
   </entry>
   <entry>
+    <title>bochs安装教程</title>
+    <url>/2024/01/17/bochs%E5%AE%89%E8%A3%85%E6%95%99%E7%A8%8B/</url>
+    <content><![CDATA[<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br><span class="line">CONFIGURE_ARGS=&quot;--enable-debugger --enable-readline&quot;</span><br></pre></td></tr></table></figure>
+
+<p>先改<code>.conf.linux</code>，里面的</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br></pre></td></tr></table></figure>
+
+<p>再使用：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">sh .conf.linux </span><br></pre></td></tr></table></figure>
+<p>然后在Makefile里面操作:</p>
+<p>我是在vscode中,Ctrl+F，将所有的<code>bochs</code>更改成<code>bochs_gdb</code>，接着将<code>bochs_gdb.h</code>更改为<code>bochs.h</code>,<code>wxbochs_gdb.rc</code>更改为<code>wxbochs.rc</code>，后面这个应该没影响，是和win有关系的，但是保险起见还是改了吧，然后进行<code>make -j16 &amp;&amp; sudo make install</code>。</p>
+]]></content>
+      <tags>
+        <tag>真相还原</tag>
+        <tag>bochs</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>epoll如何实现IO多路复用</title>
     <url>/2023/12/20/epoll%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8/</url>
     <content><![CDATA[<p>大一暑假完成了一个C++在线聊天室，对epoll的应用仅仅在于那三个函数：</p>
