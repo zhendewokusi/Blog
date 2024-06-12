@@ -1,6 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>DPDK 环境配置</title>
+    <url>/2024/06/09/DPDK-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE/</url>
+    <content><![CDATA[<h1 id="环境配置"><a href="#环境配置" class="headerlink" title="环境配置"></a>环境配置</h1><h3 id="DPDK系统要求："><a href="#DPDK系统要求：" class="headerlink" title="DPDK系统要求："></a>DPDK系统要求：</h3><p>Kernel version &gt;&#x3D; 4.14<br>GCC（版本 5.0+）或 Clang（版本 3.6+）<br>Python 3.6 或更高版本<br>Meson (version 0.53.2+) and ninja<br>pyelftools （版本 0.22+）</p>
+<h3 id="笔者环境："><a href="#笔者环境：" class="headerlink" title="笔者环境："></a>笔者环境：</h3><p>内核版本： 6.6.32-1-lts<br>发行版： ArchLinux<br>gcc 版本 14.1.1 20240522<br>Python 3.12.3<br>Meson 1.4.1<br>pyelftools 0.31-2</p>
+<h3 id="环境配置-1"><a href="#环境配置-1" class="headerlink" title="环境配置"></a>环境配置</h3><ol>
+<li>检查当前内核是否支持</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="comment"># 查看当前内核是否支持</span></span><br><span class="line">zgrep -E <span class="string">&quot;HUGETLBFS|PROC_PAGE_MONITOR&quot;</span> /proc/config.gz</span><br><span class="line">CONFIG_PROC_PAGE_MONITOR=y</span><br><span class="line">CONFIG_HUGETLBFS=y</span><br><span class="line"><span class="comment"># 查看高精度事件定时器</span></span><br><span class="line">zgrep -E <span class="string">&quot;HPET&quot;</span> /proc/config.gz     </span><br><span class="line">CONFIG_HPET_TIMER=y</span><br><span class="line">CONFIG_HPET_EMULATE_RTC=y</span><br><span class="line">CONFIG_HPET=y</span><br><span class="line"><span class="comment"># CONFIG_HPET_MMAP is not set</span></span><br></pre></td></tr></table></figure>
+
+<p>如果不支持<code>HUGETLBFS</code>或者<code>PROC_PAGE_MONITOR</code>，重编内核。</p>
+<ol start="2">
+<li>安装上述环境</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo pacman -S gcc clang pkgconf python meson ninja python-pyelftools numactl</span><br><span class="line">sudo pacman -S libarchive libelf</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>配置大页</li>
+</ol>
+<p>最简单的配置，只使用2MB的大页，没有配置1GB的，如果有需要可以官网查教程。</p>
+<p>非root用户使用<code>sudo vim</code>操作下面文件填写自己认为适合的数值，不太离谱都行。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">echo</span> 1024 &gt; /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages</span><br></pre></td></tr></table></figure>
+
+<p>HugePages_Total不为0就代表成功。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">➜  ~ <span class="built_in">cat</span> /proc/meminfo | grep Huge</span><br><span class="line">AnonHugePages:   3670016 kB</span><br><span class="line">ShmemHugePages:        0 kB</span><br><span class="line">FileHugePages:    190464 kB</span><br><span class="line">HugePages_Total:    1024</span><br><span class="line">HugePages_Free:     1024</span><br><span class="line">HugePages_Rsvd:        0</span><br><span class="line">HugePages_Surp:        0</span><br><span class="line">Hugepagesize:       2048 kB</span><br><span class="line">Hugetlb:         2097152 kB</span><br></pre></td></tr></table></figure>
+
+<h3 id="编译安装"><a href="#编译安装" class="headerlink" title="编译安装"></a>编译安装</h3><p>下载一个自己喜欢的DPDK版本，懒得话就：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">git <span class="built_in">clone</span> http://dpdk.org/git/dpdk --depth=1</span><br></pre></td></tr></table></figure>
+
+<p>进入项目主目录:</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">meson setup build</span><br><span class="line"><span class="built_in">cd</span> build</span><br><span class="line">ninja</span><br><span class="line">sudo meson install</span><br></pre></td></tr></table></figure>
+
+<p>编译安装完成后，查看路径<code>/usr/local/lib/pkgconfig</code>有无<code>和libdpdk.pc</code>，没有的话全局找一下该文件路径，并且在<code>~/.zshrc</code>添加<code>export PKG_CONFIG_PATH=/path/to/</code>，我本机设置<code>export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig</code>，完成后进行下面命令：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo ldconfig</span><br></pre></td></tr></table></figure>
+
+<h1 id="Hello-World"><a href="#Hello-World" class="headerlink" title="Hello World"></a>Hello World</h1><p>简单运行一下：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line"><span class="built_in">cd</span> examples/helloworld</span><br><span class="line">make</span><br><span class="line"><span class="built_in">cd</span> build</span><br><span class="line">sudo ./helloworld</span><br></pre></td></tr></table></figure>
+
+<p>Output:</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">➜  build git:(main) sudo ./helloworld</span><br><span class="line">EAL: Detected CPU lcores: 16</span><br><span class="line">EAL: Detected NUMA nodes: 1</span><br><span class="line">EAL: Detected shared linkage of DPDK</span><br><span class="line">EAL: Multi-process socket /var/run/dpdk/rte/mp_socket</span><br><span class="line">EAL: Selected IOVA mode <span class="string">&#x27;VA&#x27;</span></span><br><span class="line">TELEMETRY: No legacy callbacks, legacy socket not created</span><br><span class="line">hello from core 1</span><br><span class="line">hello from core 2</span><br><span class="line">hello from core 3</span><br><span class="line">hello from core 4</span><br><span class="line">hello from core 5</span><br><span class="line">hello from core 6</span><br><span class="line">hello from core 7</span><br><span class="line">hello from core 8</span><br><span class="line">hello from core 9</span><br><span class="line">hello from core 10</span><br><span class="line">hello from core 11</span><br><span class="line">hello from core 12</span><br><span class="line">hello from core 13</span><br><span class="line">hello from core 14</span><br><span class="line">hello from core 15</span><br><span class="line">hello from core 0</span><br></pre></td></tr></table></figure>
+
+]]></content>
+      <tags>
+        <tag>DPDK</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>DPL CPL RPL 门</title>
     <url>/2024/02/04/DPL-CPL-RPL/</url>
     <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><ul>
@@ -86,6 +132,9 @@
 <p>再看右侧的调用，右侧本身是不可行的，也是通过暴力尝试GDT表中的元素找到内核的数据段，这样用户就可以修改内核才能修改的数据。好了，用户既能查看还能修改，保护形同虚设。但是又不能一棒子打死，用户态做不了的事情必须让内核出手，此时RPL就很好的解决了这个问题，问题根儿不能在于CPU不知道访问者的真实身份，它不知道这是用户通过门调用进入内核的，所以这里的RPL就起到这个作用，让CPU知道真正访问这些资源的是谁，内核还是用户。</p>
 <p>现代OS基本上都弃用了调用门，使用中断门来实现系统调用。</p>
 ]]></content>
+      <tags>
+        <tag>真相还原</tag>
+      </tags>
   </entry>
   <entry>
     <title>Learn DGB</title>
@@ -256,6 +305,8 @@
     <title>TCP 超时计时器的管理</title>
     <url>/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/</url>
     <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
+<span id="more"></span>
+
 <h2 id="每连接单一计时器"><a href="#每连接单一计时器" class="headerlink" title="每连接单一计时器"></a>每连接单一计时器</h2><p>我们都能想到，如果给每一个<code>TCP</code>分段都分配一个计时器，这是最直接的方法。但是这带来了巨大的内存开销和调度开销。难不成一个<code>TCP</code>通信的服务器负担全用来给分段计时间，这太离谱了，有没有更好的办法，先人已经为我们想到了一个适用至今的方法：采取每个TCP连接单一计时器的设计。</p>
 <p>首先我们要明确，这个超时计时器需要实现什么功能：</p>
 <ol>
@@ -296,6 +347,7 @@
 <p>其第二部分就是考虑到了这种不太理想的网络情况。为每次重传的RTO设置“退避因子”，也就是常说的指数退避。在不需要重传的成功数据传输发生之前，不会重置退避因子。该部分会放置网络的拥塞，使其能从任何拥塞问题中恢复，还保证了RTT信息不会丢失，当数据成功传输而无需重传时，可以将伴随的RTT测量添加到SRTT中。</p>
 <p>目前很多TCP实现了时间戳，这样就方便多了，发送端再也不需要保存发送分段的时间了，只需要将其放入协议头的时间戳字段，然后接收端将其回显在ACK即可，然后发送端收到ACK后，取出时间戳，和当前时间做算术差，即可完成一次RTT的测量。</p>
 <p>需要注意的是：TCP 实现可以在多次回退计时器后清除 SRTT 和 RTTVAR，因为在这种情况下当前 SRTT 和 RTTVAR 很可能是假的。一旦 SRTT 和 RTTVAR 被清除，它们应该采集的下一个 RTT 样本进行初始化（RTO的第二步）。</p>
+<p>…..</p>
 ]]></content>
       <tags>
         <tag>TCP</tag>
@@ -387,24 +439,19 @@
       </tags>
   </entry>
   <entry>
-    <title>Hello World</title>
-    <url>/2023/10/02/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues">GitHub</a>.<span id="more"></span></p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
-]]></content>
+    <title>slab 分配器</title>
+    <url>/2024/06/04/slab-%E5%88%86%E9%85%8D%E5%99%A8/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文是阅读 kernel 文档中关于 Slab 分配器的文档所写的笔记。</p>
+<p>slab分配器背后的基本思想：让常用对象的缓存保持在初始化状态供给内核使用。</p>
+<h2 id="slab-分配器的三个主要目标"><a href="#slab-分配器的三个主要目标" class="headerlink" title="slab 分配器的三个主要目标"></a>slab 分配器的三个主要目标</h2><ol>
+<li>分配小内存块有助于消除由伙伴系统引起的内部碎片。slab内部维护了两组小内存缓冲区的缓存，范围从32字节到131072（2的17次方）字节。</li>
+<li>缓存常用的对象，使系统不会浪费时间分配、初始化和销毁对象。当创建一个新的slab时，将很多对象进行打包并且进行初始化；当对象被释放，它保持其初始化状态，以便于下一次的对象分配。</li>
+<li>通过将对象与L1与L2缓存对齐，更好利用硬件缓存。这是slab的最本质的任务，如果一个对象打包进slab后还有剩余空间，slab就将其进行着色，使其与CPU L1缓存对齐。</li>
+</ol>
+<h2 id="主体"><a href="#主体" class="headerlink" title="主体"></a>主体</h2><p> slabs_full 的所有对象都在使用中。 slabs_partial 中有空闲对象，因此是分配对象的主要候选者。 slabs_free 没有分配的对象，是slab 销毁的主要候选者。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// The slab lists for all objects.</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">kmem_cache_node</span> &#123;</span></span><br><span class="line">	<span class="type">spinlock_t</span> list_lock;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLAB</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_partial</span>;</span>	<span class="comment">/* partial list first, better asm code */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_full</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_free</span>;</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> total_slabs;	<span class="comment">/* length of all slab lists */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_slabs;	<span class="comment">/* length of free slab list only */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_objects;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> free_limit;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> colour_next;	<span class="comment">/* Per-node cache coloring */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">array_cache</span> *<span class="title">shared</span>;</span>	<span class="comment">/* shared per node */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">alien_cache</span> **<span class="title">alien</span>;</span>	<span class="comment">/* on other nodes */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> next_reap;	<span class="comment">/* updated without locking */</span></span><br><span class="line">	<span class="type">int</span> free_touched;		<span class="comment">/* updated without locking */</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> nr_partial;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">partial</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB_DEBUG</span></span><br><span class="line">	<span class="type">atomic_long_t</span> nr_slabs;</span><br><span class="line">	<span class="type">atomic_long_t</span> total_objects;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">full</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>]]></content>
       <tags>
-        <tag>hexo</tag>
+        <tag>内核</tag>
       </tags>
   </entry>
   <entry>
@@ -425,6 +472,108 @@
 <figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="built_in">vector</span>&lt;<span class="type">int</span>&gt; palin;</span><br><span class="line"><span class="keyword">auto</span> init = [] &#123;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> base = <span class="number">1</span>;base &lt;= <span class="number">10000</span>;base*=<span class="number">10</span>) &#123;</span><br><span class="line">        <span class="comment">// 奇数</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">            <span class="type">int</span> num = i;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> m = i / <span class="number">10</span>;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            palin.push_back(num);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 偶数</span></span><br><span class="line">       <span class="keyword">if</span>(base &lt;= <span class="number">1000</span>)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">                <span class="type">int</span> num = i;</span><br><span class="line">                <span class="keyword">for</span>(<span class="type">int</span> m = i;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                    num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                palin.push_back(num);</span><br><span class="line">            &#125;</span><br><span class="line">       &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    palin.push_back(<span class="number">1&#x27;000&#x27;000&#x27;001</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;();</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> &#123;</span></span><br><span class="line">public:</span><br><span class="line">    <span class="type">long</span> <span class="type">long</span> <span class="title function_">minimumCost</span><span class="params">(<span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;&amp; nums)</span> &#123;</span><br><span class="line">        sort(nums.begin(),nums.end());</span><br><span class="line">        <span class="type">int</span> n = nums.size();</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">auto</span> distance = [&amp;](<span class="type">int</span> i) -&gt; <span class="type">long</span> <span class="type">long</span> &#123;</span><br><span class="line">            <span class="type">long</span> <span class="type">long</span> sum = <span class="number">0</span>;</span><br><span class="line">            <span class="type">int</span> target = palin[i];</span><br><span class="line">            <span class="keyword">for</span>(<span class="keyword">auto</span>&amp; e : nums) &#123;</span><br><span class="line">                sum += <span class="built_in">abs</span>(e - target);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> sum;</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        <span class="type">int</span> i = lower_bound(palin.begin(),palin.end(),nums[(n<span class="number">-1</span>)/<span class="number">2</span>]) - palin.begin();</span><br><span class="line">        <span class="keyword">if</span>(palin[i] &lt;= nums[n / <span class="number">2</span>])  <span class="keyword">return</span> distance(i);</span><br><span class="line">        <span class="keyword">return</span> min(distance(i),distance(i - <span class="number">1</span>));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>]]></content>
       <tags>
         <tag>算法</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>中断</title>
+    <url>/2024/02/07/%E4%B8%AD%E6%96%AD/</url>
+    <content><![CDATA[<h2 id="中断种类"><a href="#中断种类" class="headerlink" title="中断种类"></a>中断种类</h2><h3 id="1-外部中断"><a href="#1-外部中断" class="headerlink" title="1. 外部中断"></a>1. 外部中断</h3><p>外部中断又可以细分为可屏蔽中断和不可屏蔽中断。</p>
+<h3 id="2-内部中断"><a href="#2-内部中断" class="headerlink" title="2. 内部中断"></a>2. 内部中断</h3><p>内部中断可以分为<strong>软中断</strong>和<strong>异常</strong>。<br>软中断是由软件<strong>主动</strong>发起的中断，并不是发生了某种错误。<br>发起软中断的指令：</p>
+<ul>
+<li><code>int 8位立即数</code>。常用于系统调用，可表示256种中断。</li>
+<li><code>int3</code>。调试断点指令，中断向量号是3。我们常用的<code>gdb</code>或者<code>bochs</code>调试实际上就是使用到了这个指令。运行<code>gdb</code>的进程fork一个子进程用来运行被调试的程序，调试器打断点的本质是：将对应断点的地址的第一个字节备份并更改为<code>0xcc</code>，这样程序运行到断点处就会触发中断处理程序，运行中断处理程序之前要将当前的寄存器等数据压栈保存，查看寄存器或者变量实际上是从栈中获取的。</li>
+<li><code>into</code>。中断溢出指令，中断向量号是4。在<code>eflags</code>寄存器的<code>OF</code>位为1的前提下触发中断。</li>
+<li><code>bound</code>。数组索引越界检查指令，中断向量号是5。指令格式<code>bound 16/32位 内存/寄存器</code>，如果数据访问越界，则触发该中断。</li>
+<li><code>ud2</code>。未定义指令，中断向量号是6。表示该指令CPU无法识别。</li>
+</ul>
+<p>除了第一个是软中断外，其余是软中断，也可以认为是异常。因为它们既具备软中断的“主动”行为,又具备异常的“错误”结果。</p>
+<p>异常可以分为三类：</p>
+<ol>
+<li>Fault（故障）。比如缺页中断，这类异常交给对应的异常处理程序很大概率会被修复，甚至对操作系统有益处。</li>
+<li>Trap(陷阱)。比如调试时候的<code>int3</code>，掉入了CPU设下的陷阱，很形象。</li>
+<li>Abort(终止)。这是最严重的异常，意味着不可修复，操作系统为了正常运行，会直接将其从进程表中删除。通常是硬件出错或者内核某些数据结构出错。</li>
+</ol>
+<h2 id="中断描述符表"><a href="#中断描述符表" class="headerlink" title="中断描述符表"></a>中断描述符表</h2><p>中断描述符表(Interrupt Descriptor Table,IDT)是保护模式下用于存储中断处理程序入口的表。由于操作系统是中断驱动的，实模式下存储中断的是中断向量表。</p>
+<p>中断向量表和中断描述符表的区别？</p>
+<ul>
+<li>中断描述符表地址不限制,在哪里都可以。</li>
+<li>中断描述符表中的每个描述符用 8 字节描述。</li>
+</ul>
+<h2 id="中断处理过程以及保护"><a href="#中断处理过程以及保护" class="headerlink" title="中断处理过程以及保护"></a>中断处理过程以及保护</h2><p>一个完整的中断包含CPU内部的CPU外部和CPU内部两个部分以及特权级的检查。</p>
+<p>CPU 外:外部设备的中断由中断代理芯片接收,处理后将该中断的中断向量号发送到 CPU。<br>CPU 内:CPU 执行该中断向量号对应的中断处理程序。</p>
+<p>这里只讨论CPU内部的过程：</p>
+<ol>
+<li><p>处理器根据中断向量号定位中断门描述符。</p>
+</li>
+<li><p>处理器进行特权级检查。当前的特权级CPL必须在门描述符DPL和门中代码段描述符DPL之间（防止用户主动调用只为内核服务的例程）。</p>
+<ol>
+<li>如果是由软中断 <code>int n</code>、<code>int3</code> 和 <code>into</code> 引发的中断,这些是用户进程中主动发起的中断,由用户代码控制,处理器要检查当前特权级 CPL 和门描述符 DPL,这是检查进门的特权下限,如果 CPL 权限大于等于 DPL,即数值上 CPL≤门描述符 DPL,特权级“门槛”检查通过,进入下一步的“门框”检查。否则,处理器抛出异常。</li>
+<li>这一步检查特权级的上限(门框):处理器要检查当前特权级 CPL 和门描述符中所记录的选择子对应的目标代码段 DPL,如果 CPL 权限小于目标代码段 DPL,即数值上 CPL&gt;目标代码段 DPL,检查通过。否则 CPL 若大于等于目标代码段 DPL,处理器将引发异常,也就是说,除了用返回指令从高特权级返回,特权转移只能发生在由低向高。</li>
+<li>若中断是由外部设备和异常引起的,只直接检查 CPL 和目标代码段的 DPL,和上面的步骤2是一样的,要求 CPL 权限小于目标代码段 DPL,即数值上 CPL &gt;目标代码段 DPL,否则处理器引发异常。</li>
+</ol>
+</li>
+<li><p>执行中断处理程序。</p>
+</li>
+</ol>
+<p><img src="/../image/%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B.png" alt="中断处理过程"></p>
+<p>由于IDT中会有中断门，陷阱门，任务门。中断发生时候会将NT位和TF位置为0。</p>
+<p>NT位和TF位：<br>当 NT 标志被设置为 1 时，表示允许任务嵌套。设置为0表示进入了中断处理程序。这里还有个作用，<code>iret</code>指令既可以从新任务返回到旧任务，也可以从中断返回，这里 NT 标志就是区分到底是哪种返回。<br>当 TF 标志被设置为 1 时，会启用单步调试模式。设置为0也很容易想到，中断程序怎么会让你单步调试捏。</p>
+<p>如果执行的是中断门时，会将IF位设置为0,避免中断嵌套，如果是陷阱门或者任务门则不会设置IF位为0，允许CPU响应更高级别的中断。当然也可以在中断处理程序中将IF位置为1,这样就可以处理优先级更高的中断。eflags寄存器有些位可以通过和栈配合来更改位，但是这有内存操作，效率低下且不是原子操作，所以专门给IF位提供了控制指令：<code>sti</code>开中断和<code>cli</code>关中断。IF 位(中断允许位)只能限制外部设备的中断,对那些影响系统正常运行的中断都无效,如异常 exception,软中断,如 int n 等,不可屏蔽中断 NMI 都不受 IF 限制。</p>
+<h3 id="中断发生时候的压栈"><a href="#中断发生时候的压栈" class="headerlink" title="中断发生时候的压栈"></a>中断发生时候的压栈</h3><p>布拉布拉….</p>
+<h2 id="可编程中断控制器-8259A"><a href="#可编程中断控制器-8259A" class="headerlink" title="可编程中断控制器 8259A"></a>可编程中断控制器 8259A</h2><p>最理想的方式是每个外设准备一个引脚接收中断，但是这明显不现实，成本高收益低。这时候一个中间层代理就显得智慧，这里使用的是Intel 8259A芯片。传统的PIC(就是可编程中断控制器 Programmable Interrupt Controller 的简称)是两片8259A风格的芯片级联的方式连接在一起。每个芯片可以处理8个不同的IRQ（中断请求）输入线，因为从PIC的INT输出线到主PIC的IRQ2引脚，因此可用的IRQ引脚只有<code>16 - 1</code>个。这种情况仅仅在系统只有一个CPU的情况下，将主芯片的输出引脚连接CPU的INTR引脚，但是系统有多个CPU就不适用了，引入了ACPI的新组件来代替老式的8259A芯片，这里只学习8259A芯片的原理和操作方式，不涉及多处理器的情况。<br>8259A可以管理和控制<strong>可屏蔽中断</strong>，它可以屏蔽外设中断，判断中断优先级，向CPU提供中断向量号，这些功能都是可编程的。 外接设备通过主板线路和8259A芯片连接在一起。下面是个人计算机中芯片级联方式：<br><img src="/../image/%E4%B8%AA%E4%BA%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BA%A7%E8%81%94.png" alt="级联"></p>
+<h3 id="内部结构"><a href="#内部结构" class="headerlink" title="内部结构"></a>内部结构</h3><ul>
+<li>INT: 芯片挑选出来优先级最高的中断请求，发信号给CPU。</li>
+<li>INTA: INT Acknowledge,中断响应信号。用于接收CPU的INTA接口的中断响应信号。</li>
+<li>IMR(Interrupt Mask Register): 中断屏蔽寄存器，8位，用来屏蔽某个外设的中断信号。</li>
+<li>IRR(Interrupt Request Register): 中断请求寄存器，8位，用来存储等待处理的中断。</li>
+<li>PR(Priority Resolver): 优先仲裁器，找出优先级最高的中断。</li>
+<li>ISR(In-Service Register): 中断服务寄存器，8位，存储正在处理的中断。</li>
+</ul>
+<p><img src="/../image/8259A%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84.png" alt="级联"></p>
+<h3 id="工作流程"><a href="#工作流程" class="headerlink" title="工作流程"></a>工作流程</h3><ol>
+<li>外设发出一个中断信号，通过主板线路将信号传递给芯片的某个IRQ接口。</li>
+<li>8259A首先检查IMR寄存器是否屏蔽了该IRQ接口的中断信号，如果为1则表示屏蔽，直接忽略。否则将其送入IRR寄存器，将其对应位置为1。</li>
+<li>PR寄存器找出优先级最高的中断（这里优先级判断很简单，IRQ接口接口号越低，优先级越大）。</li>
+<li>芯片在控制电路中通过INT接口向CPU发送INTR信号，信号传入CPU的INTR接口后，CPU就知道有新的中断到来，执行完手里的指令就向自己的INTA接口向8259A回复一个中断响应信号，表示CPU准备就绪。</li>
+<li>8259A受到信号后，将刚才选出来的优先级最高的中断在ISR中置为1,同时将IRR中置为0。</li>
+<li>CPU再次发送INTA信号，为了获取中断对应的中断向量号。</li>
+<li>如果8259A的EOI（End of Interrupt）被设置为手动模式，中断处理程序必须有向8259A发送EOI的代码，芯片受到EOI后会自动将ISR对应中断位置为0。</li>
+</ol>
+<p>需要注意的是：并不是进入了 ISR 后的中断就高枕无忧了,它还是有可能被后者换下来的。比如,在 8259A 发送中断向量号给 CPU 之前,这时候又来了新的中断,如果它的来源 IRQ 接口号比 ISR 中的低,也就是优先级更高,原来 ISR 中准备上 CPU 处理的旧中断,其对应的 BIT 就得清 0,同时将它所在的 IRR中的相应 BIT 恢复为 1,随后在 ISR 中将此优先级更高的新中断对应的 BIT 置 1,然后将此新中断的中断向量号发给 CPU。</p>
+<h3 id="实际操作"><a href="#实际操作" class="headerlink" title="实际操作"></a>实际操作</h3><p>说了那么多，我们最终目的很简单：</p>
+<ol>
+<li>构建IDT</li>
+<li>提供中断向量号</li>
+</ol>
+<p>8259A内部有两组寄存器：初始化命令寄存器组(ICW1 ~ ICW4)，操作命令寄存器组(OCW1 ~ OCW3)。因此我们的操作也分为初始化和操作两部分。</p>
+<h4 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h4><p>注意：ICW1 ~ ICW4的初始是有严格顺序的。必须依次写入 ICW1、ICW2、ICW3、ICW4。因为其中某些设置是由关联，依赖的。</p>
+<h5 id="ICW1"><a href="#ICW1" class="headerlink" title="ICW1"></a>ICW1</h5><p>用来初始化 8259A 的连接方式和中断信号的触发方式。连接方式是指用单片工作,还是用多片级联工作,触发方式是指中断请求信号是电平触发,还是边沿触发。</p>
+<p><img src="/../image/ICW1.png" alt="ICW1"></p>
+<p>IC4：表示是否写入ICW4,该位为1表示需要在后面写入ICW4,为0则不需要。x86必须设置为1。<br>SNGL：该位为1,表示是单片，为0则表示级联。<br>ADI：用来设置8259A的调用时间间隔，x86不需要设置。<br>LTIM：表示中断检测方式，为0表示边沿触发，为1表示电平触发。<br>第四位恒定为1。<br>第5~7位专用于8085处理器，x86不需要，设置为0。</p>
+<h5 id="ICW2"><a href="#ICW2" class="headerlink" title="ICW2"></a>ICW2</h5><p>用来设置起始中断向量号。需要写入主片的0x21端口和从片的0xA1端口。<br>我们只需要写高五位的T3~T7，所以任意数字都是8的倍数，这个数字便是设定的起始中断向量号。第三位可以表示8个中断向量号，这是根据8259A芯片自行导入，这样就能表示任意一个IQR接口实际分配的中断向量号。</p>
+<p><img src="/../image/ICW2.png" alt="ICW2"></p>
+<h5 id="ICW3"><a href="#ICW3" class="headerlink" title="ICW3"></a>ICW3</h5><p>在级联的前提下才能使用，用来设置主从片用哪个IRQ接口互联。需要写入主片的0x21端口和从片的0xA1端口。<br>对于主片，哪个IRQ接口用于连接从片，就将其设置为1（可以设置多个从片），设置为0表示是外接设备。<br>对于从片，只需要在从片上指定主片用于连接自己的IRQ接口。这样中断发生后，主片会发送与从片做级联的 IRQ 接口号,所有从片用自己的 ICW3 的低 3 位和它对比,若一致则认为是发给自己的。高五位没用到，设置为0。</p>
+<p><img src="/../image/%E4%B8%BB%E7%89%87ICW3.png" alt="ICW3主片"><br><img src="/../image/%E4%BB%8E%E7%89%87ICW3.png" alt="ICW3从片"></p>
+<h5 id="ICW4"><a href="#ICW4" class="headerlink" title="ICW4"></a>ICW4</h5><p><img src="/../image/ICW4.png" alt="ICW4"></p>
+<p>SFNM 表示特殊全嵌套模式(Special Fully Nested Mode) ,若 SFNM 为 0,则表示全嵌套模式,若 SFNM为 1,则表示特殊全嵌套模式。<br>BUF 表示本 8259A 芯片是否工作在缓冲模式。BUF 为 0,则工作非缓冲模式,BUF 为 1,则工作在缓冲模式。<br>当多个 8259A 级联时,如果工作在缓冲模式下,M&#x2F;S 用来规定本 8259A 是主片,还是从片。若 M&#x2F;S 为 1 ,则表示则表示是主片,若 M&#x2F;S 为 0,则表示是从片。若工作在非缓冲模式(BUF 为 0)下,M&#x2F;S 无效。<br>AEOI 表示自动结束中断(Auto End Of Interrupt) ,8259A 在收到中断结束信号时才能继续处理下一个中断,此项用来设置是否要让 8259A 自动把中断结束。若 AEOI 为 0,则表示非自动,即手动结束中断,咱们可以在中断处理程序中或主函数中手动向 8259A 的主、从片发送 EOI 信号。这种“操作”类命令,通过下面要介绍的 OCW 进行。若 AEOI 为 1,则表示自动结束中断。<br>μPM 表示微处理器类型(microprocessor) ,此项是为了兼容老处理器。若 μPM 为 0,则表示 8080 或8085 处理器,若 μPM 为 1,则表示 x86 处理器。</p>
+<h4 id="OCW"><a href="#OCW" class="headerlink" title="OCW"></a>OCW</h4><h5 id="OCW1"><a href="#OCW1" class="headerlink" title="OCW1"></a>OCW1</h5><p><img src="/../image/OCW1.png" alt="OCW1"></p>
+<p>需要写入主片的0x21端口和从片的0xA1端口。<br>OCW1 用来屏蔽连接在 8259A 上的外部设备的中断信号，还记得上面说的IMR(Interrupt Mask Register)吗？实际上就是将OCW1的数据填入该寄存器中。为1表示该位被屏蔽。</p>
+<h5 id="OCW2"><a href="#OCW2" class="headerlink" title="OCW2"></a>OCW2</h5><p><img src="/../image/OCW2.png" alt="OCW2"></p>
+<p>OCW2 要写入到主片的 0x20 及从片的 0xA0 端口。<br>OCW2 用来设置中断结束方式和优先级模式。</p>
+<p>SL：Specific Level,表示是否指定优先等级。等级是用低 3 位来指定的。此处的 SL 只是开启低 3 位的开关,所以 SL 也表示低 3 位的 L2~L0 是否有效。SL 为 1 表示有效,SL 为 0 表示无效。</p>
+<p>OCW2 其中的一个作用就是发 EOI 信号结束中断。如果使 SL 为 1,可以用 OCW2 的低 3 位(L2<del>L0)来指定位于 ISR 寄存器中的哪一个中断被终止,也就是结束来自哪个 IRQ 接口的中断信号。如果 SL 位为 0,L2</del>L0 便不起作用了,8259A 会自动将正在处理的中断结束,也就是把 ISR 寄存器中优先级最高的位清 0。</p>
+<p>R：用来设置优先级控制方式。为0，则IRQ接口号越低，优先级越高。<br>R为1:设置为循环优先级方式。</p>
+<ol>
+<li>SL为0，初始优先级次序为IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5&gt;IR6&gt;IR7。</li>
+<li>SL为1,通过 L2<del>L1 指定最低优先级是哪个 IRQ 接口。<br>举个例子,在 R 和 SL 都等于 1 的情况下,若想指定 IR5 为最低的优先级,需要将 L2</del>L0 置为 101。<br>这样,新的初始优先级循环是:IR6&gt;IR7&gt;IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5。什么是循环优先级方式？当前 IR6 为最高级别中断请求,处理完成后,IR6 将变成最低级别,IR7 变成最高级别,这一组循环之后的优先级变成了:IR7&gt;IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5&gt;IR6。</li>
+</ol>
+<p>EOI：End Of Interrupt,为中断结束命令位。令 EOI 为 1,则会令 ISR 寄存器中的相应位清 0,也就是<br>将当前处理的中断清掉,表示处理结束。向 8259A 主动发送 EOI 是手工结束中断的做法,所以,使用此<br>命令有个前提,就是 ICW4 中的 AEOI 位为 0,非自动结束中断时才用。</p>
+<p>只有EOI位为1时候，表示发送中断结束。</p>
+<p>OCW3用于设定特殊的屏蔽方式以及查询方式。</p>
+<h4 id="编写中断处理程序"><a href="#编写中断处理程序" class="headerlink" title="编写中断处理程序"></a>编写中断处理程序</h4><p>中断向量 0<del>19 为处理器内部固定的异常类型,20</del>31 是 Intel 保留的，所以咱们可用的中断向量号最低是 32,将来咱们在设置 8259A 的时候,会把 IR0 的中断向量号设置为 32。</p>
+]]></content>
+      <tags>
+        <tag>真相还原</tag>
       </tags>
   </entry>
   <entry>
@@ -538,6 +687,14 @@
 ]]></content>
       <tags>
         <tag>x86汇编</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>内核模块添加</title>
+    <url>/2024/06/04/%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97%E6%B7%BB%E5%8A%A0/</url>
+    <content><![CDATA[]]></content>
+      <tags>
+        <tag>内核</tag>
       </tags>
   </entry>
   <entry>
@@ -815,6 +972,28 @@
       </tags>
   </entry>
   <entry>
+    <title>搭建内核调试环境</title>
+    <url>/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/</url>
+    <content><![CDATA[<ol>
+<li>下载 linux 源码，v6.10-rc2</li>
+<li>在项目根目录下执行 <code>make menuconfig</code></li>
+</ol>
+<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>Kernel hacking  —&gt;<br>    Compile-time checks and compiler options  —&gt;<br>        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;<br>            (X) Generate DWARF Version 5 debuginfo </p>
+<pre><code>[*] Provide GDB scripts for kernel debugging 
+</code></pre>
+<p>make -j8</p>
+<p>busybox 1.36.1</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line">code scripts/kconfig/lxdialog/Makefile</span><br><span class="line"><span class="meta"># always		:= $(hostprogs-y) dochecklxdialog</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">make menuconfig</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>[*] Build static binary (no shared libs)  </p>
+]]></content>
+      <tags>
+        <tag>内核</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>条款 21 :优先选用 std::make_unique 和std::make_shared, 而非直接使用 new</title>
     <url>/2023/10/09/%E6%9D%A1%E6%AC%BE21/</url>
     <content><![CDATA[<h4 id="使用std-make-shared的理由-代码精简"><a href="#使用std-make-shared的理由-代码精简" class="headerlink" title="使用std::make_shared的理由:代码精简"></a>使用std::make_shared的理由:代码精简</h4><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function"><span class="keyword">auto</span> <span class="title">upw1</span><span class="params">(std::make_unique&lt;Widget&gt;())</span></span>;</span><br><span class="line"><span class="function">std::unique_ptr&lt;Widget&gt; <span class="title">upw2</span><span class="params">(<span class="keyword">new</span> Widget)</span></span>;</span><br><span class="line"><span class="function"><span class="keyword">auto</span> <span class="title">spw1</span><span class="params">(std::make_shared&lt;Widget&gt;())</span></span>;</span><br><span class="line"><span class="function">std::shared_ptr&lt;Widget&gt; <span class="title">spw2</span><span class="params">(<span class="keyword">new</span> Widget)</span></span>;</span><br></pre></td></tr></table></figure>
@@ -969,6 +1148,34 @@
       </tags>
   </entry>
   <entry>
+    <title>深入浅出DPDK-1</title>
+    <url>/2024/06/08/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BADPDK-1/</url>
+    <content><![CDATA[<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>该文章仅用于个人阅读笔记使用，如有错误，敬请指正。</p>
+<h1 id="什么是DPDK？"><a href="#什么是DPDK？" class="headerlink" title="什么是DPDK？"></a>什么是DPDK？</h1><p>什么是DPDK?对于用户来说,它可能是一个性能出色的包数据处理加速软件库;对于开发者来说,它可能是一个实践包处理新想法的创新工场;对于性能调优者来说,它可能又是一个绝佳的成果分享平台。当下火热的网络功能虚拟化,则将DPDK放在一个重要的基石位置。</p>
+<p>DPDK最初的动机很简单,就是证明IA多核处理器能够支撑高性能数据包处理。随着早期目标的达成和更多通用处理器体系的加入,DPDK逐渐成为通用多核处理器高性能数据包处理的业界标杆。</p>
+<h2 id="IA不适合进行数据包处理吗？"><a href="#IA不适合进行数据包处理吗？" class="headerlink" title="IA不适合进行数据包处理吗？"></a>IA不适合进行数据包处理吗？</h2><p>Linux系统为例，内核栈处理数据包流程：</p>
+<ol>
+<li>数据包到达网卡。</li>
+<li>网卡通过DMA将数据包复制到内存中的接收缓冲区。</li>
+<li>网卡发送中断信号通知CPU有新的数据包到达。</li>
+<li>中断处理程序被触发，处理该中断。</li>
+<li>驱动程序将数据包从网卡的接收缓冲区移到内核的网络栈中，并将其放入适当的队列中。</li>
+<li>内核网络栈对数据包进行处理（例如，协议栈处理，IP、TCP&#x2F;UDP等）。</li>
+<li>根据数据包的目的地，内核决定下一步操作：<ul>
+<li>如果数据包需要在内核态进行处理，则直接在内核态处理。</li>
+<li>如果数据包需要由用户态应用程序处理，则内核将数据包放入相应的套接字缓冲区中。</li>
+</ul>
+</li>
+<li>用户态应用程序通过系统调用读取数据包，数据从内核态（CPU）复制到用户态的缓冲区中，然后进行处理。</li>
+</ol>
+<p>在网络带宽向万兆发展时，大量的中断操作会严重降低处理性能。当然Linux操作系统对此也提出了<code>NAPI</code>机制，NAPI 是 Linux 上采用的一种提高网络处理效率的技术，它的核心概念就是不采用中断的方式读取数据，而代之以首先采用中断唤醒数据接收的服务程序，然后 POLL 的方法来轮询数据。以此来减少中断；问题是数据还需要做一次 CPU copy，复制操作也是很大的性能开销。对此也有处理方案，就是<code>Netmap</code>，使用共享数据包池减少这次CPU copy；还有问题：Linux是分时操作系统，需要进行进&#x2F;线程进行对应的调度操作，那么它们的上下文切换以及<code>cache miss</code>和 <code>cache write back</code>也会对极致的网络性能带来影响。</p>
+<h2 id="DPDK预取"><a href="#DPDK预取" class="headerlink" title="DPDK预取"></a>DPDK预取</h2><p><img src="/image.png" alt="alt text"></p>
+<p>在DPDK运行的时候,会使用mmap()系统调用把大页映射到用户态的虚拟地址空间,然后就可以正常使用了。</p>
+<h3 id="DDIO"><a href="#DDIO" class="headerlink" title="DDIO"></a>DDIO</h3><p>DDIO技术之前是如何进行处理网络数据的：当一个网络报文送到服务器的网卡时,网卡通过外部总线(比如PCI总线)把数据和报文描述符送到内存。接着,CPU从内存读取数据到Cache进而到寄存器。进行处理之后,再写回到Cache,并最终送到内存中。最后,网卡读取内存数据,经过外部总线送到网卡内部,最终通过网络接口发送出去。</p>
+<p>DDIO技术是如何改进的呢?这种技术使外部网卡和CPU通过LLCCache直接交换数据,绕过了内存这个相对慢速的部件。这样,就增加了CPU处理网络报文的速度(减少了CPU和网卡等待内存的时间),减小了网络报文在服务器端的处理延迟。</p>
+]]></content>
+  </entry>
+  <entry>
     <title>硬件控制器端口</title>
     <url>/2024/01/17/%E7%A1%AC%E4%BB%B6%E6%8E%A7%E5%88%B6%E5%99%A8%E7%AB%AF%E5%8F%A3-md/</url>
     <content><![CDATA[<p>哎！当时懒得记笔记，到头来还是得重新回头翻书看，这次顺带把笔记做上。</p>
@@ -992,12 +1199,103 @@
 <li>判断自己处理主盘还是从盘?读操作或者写操作?</li>
 <li>后续具体的LBA地址,操作扇区数量等下面会详细说明。</li>
 </ol>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">; eax 起始的逻辑扇区号</span><br><span class="line">; bx 读取到内存的具体地址</span><br><span class="line">; cx 总读取的扇区数</span><br><span class="line">rd_disk_16:</span><br><span class="line">    mov esi,eax</span><br><span class="line">    mov di,cx</span><br><span class="line">    mov ax,cx</span><br><span class="line"></span><br><span class="line">    ; 0x1f2 给传入需要读取的扇区数量</span><br><span class="line">    mov dx,0x1f2</span><br><span class="line">    out dx,al</span><br><span class="line">    mov cl,8</span><br><span class="line">    mov eax,esi</span><br><span class="line">    ; 3 ~ 5 是LBA地址的部分</span><br><span class="line">    mov dx,0x1f3</span><br><span class="line">    out dx,al</span><br><span class="line"></span><br><span class="line">    shr eax,cl</span><br><span class="line">    mov dx,0x1f4</span><br><span class="line">    out dx,al</span><br><span class="line"></span><br><span class="line">    shr eax,cl</span><br><span class="line">    mov dx,0x1f5</span><br><span class="line">    out dx,al</span><br><span class="line">    shr eax,cl</span><br><span class="line">    ; 这里是为了保存LBA地址</span><br><span class="line">    and al,0x0f</span><br><span class="line">    ; 设置属性</span><br><span class="line">    or al,0xe0</span><br><span class="line">    mov dx,0x1f6</span><br><span class="line">    out dx,al</span><br><span class="line">    </span><br><span class="line">    ; 读命令</span><br><span class="line">    mov al,0x20</span><br><span class="line">    mov dx,0x1f7</span><br><span class="line">    out dx,al</span><br><span class="line">.readying:</span><br><span class="line">    nop</span><br><span class="line">    in al, dx</span><br><span class="line">    test al, 0x80 ; 检查状态寄存器的 bsy 位</span><br><span class="line">    jnz .readying ; 如果 bsy 位为 1，等待磁盘准备好</span><br><span class="line">    ; 获取需要读取多少次,一次一个字所以是512 / 2</span><br><span class="line">    mov ax,di</span><br><span class="line">    mov dx,256</span><br><span class="line">    mul dx</span><br><span class="line">    mov ecx,0</span><br><span class="line">    mov cx,ax</span><br><span class="line">    mov dx,0x1f0</span><br><span class="line">.for_memory:</span><br><span class="line">    in ax,dx</span><br><span class="line">    mov [bx],ax</span><br><span class="line">    add bx,2</span><br><span class="line">    loop .for_memory</span><br><span class="line"></span><br><span class="line">.error:</span><br><span class="line">    ; 错误处理</span><br><span class="line">    ; 根据错误类型进行处理</span><br><span class="line">    ret</span><br></pre></td></tr></table></figure>
-<p>写一半懒得写了,赶进度,等有时间回来细写…</p>
 ]]></content>
       <tags>
         <tag>真相还原</tag>
       </tags>
+  </entry>
+  <entry>
+    <title>简单防火墙</title>
+    <url>/2024/05/19/%E7%AE%80%E5%8D%95%E9%98%B2%E7%81%AB%E5%A2%99/</url>
+    <content><![CDATA[<p>写一个简单的包过滤防火墙涉及到使用 <code>netfilter</code> 框架，<code>netfilter</code> 是 Linux 内核中的一个子系统，用于处理和过滤网络数据包。我们可以使用 <code>iptables</code> 来设置规则，但如果我们想要自己编写代码，则需要编写一个内核模块或使用 <code>libnetfilter_queue</code> 来处理用户空间的包过滤。这里我们使用 <code>libnetfilter_queue</code> 库来编写一个简单的包过滤防火墙。</p>
+<h3 id="环境设置"><a href="#环境设置" class="headerlink" title="环境设置"></a>环境设置</h3><p>首先，确保你已经安装了必要的库和开发包。可以使用以下命令安装它们：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo apt-get install libnetfilter-queue-dev</span><br></pre></td></tr></table></figure>
+
+<h3 id="防火墙代码"><a href="#防火墙代码" class="headerlink" title="防火墙代码"></a>防火墙代码</h3><p>下面是一个简单的 C 代码示例，使用 <code>libnetfilter_queue</code> 来过滤数据包。这个防火墙只允许 ICMP（如 ping）和 TCP 数据包通过，拒绝其他类型的数据包。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;netinet/ip.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;linux/netfilter.h&gt;</span>        <span class="comment">/* for NF_ACCEPT */</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;libnetfilter_queue/libnetfilter_queue.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* Callback function to process packets */</span></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cb</span><span class="params">(<span class="keyword">struct</span> nfq_q_handle *qh, <span class="keyword">struct</span> nfgenmsg *nfmsg,</span></span><br><span class="line"><span class="params">              <span class="keyword">struct</span> nfq_data *nfa, <span class="type">void</span> *data)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfqnl_msg_packet_hdr</span> *<span class="title">ph</span>;</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">char</span> *payload;</span><br><span class="line">    <span class="type">int</span> id = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    ph = nfq_get_msg_packet_hdr(nfa);</span><br><span class="line">    <span class="keyword">if</span> (ph) &#123;</span><br><span class="line">        id = ntohl(ph-&gt;packet_id);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> ret = nfq_get_payload(nfa, &amp;payload);</span><br><span class="line">    <span class="keyword">if</span> (ret &gt;= <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">iphdr</span> *<span class="title">ip_header</span> =</span> (<span class="keyword">struct</span> iphdr *)payload;</span><br><span class="line">        <span class="keyword">if</span> (ip_header-&gt;protocol == IPPROTO_ICMP || ip_header-&gt;protocol == IPPROTO_TCP) &#123;</span><br><span class="line">            <span class="comment">// Allow ICMP and TCP packets</span></span><br><span class="line">            <span class="keyword">return</span> nfq_set_verdict(qh, id, NF_ACCEPT, <span class="number">0</span>, <span class="literal">NULL</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Drop all other packets</span></span><br><span class="line">    <span class="keyword">return</span> nfq_set_verdict(qh, id, NF_DROP, <span class="number">0</span>, <span class="literal">NULL</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> **argv)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfq_handle</span> *<span class="title">h</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfq_q_handle</span> *<span class="title">qh</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfnl_handle</span> *<span class="title">nh</span>;</span></span><br><span class="line">    <span class="type">int</span> fd;</span><br><span class="line">    <span class="type">int</span> rv;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">4096</span>] __attribute__ ((aligned));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Opening library handle\n&quot;</span>);</span><br><span class="line">    h = nfq_open();</span><br><span class="line">    <span class="keyword">if</span> (!h) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_open()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Unbinding existing nf_queue handler for AF_INET (if any)\n&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (nfq_unbind_pf(h, AF_INET) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_unbind_pf()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Binding nfnetlink_queue as nf_queue handler for AF_INET\n&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (nfq_bind_pf(h, AF_INET) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_bind_pf()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Binding this socket to queue &#x27;0&#x27;\n&quot;</span>);</span><br><span class="line">    qh = nfq_create_queue(h,  <span class="number">0</span>, &amp;cb, <span class="literal">NULL</span>);</span><br><span class="line">    <span class="keyword">if</span> (!qh) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_create_queue()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Setting copy_packet mode\n&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (nfq_set_mode(qh, NFQNL_COPY_PACKET, <span class="number">0xffff</span>) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Can&#x27;t set packet_copy mode\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    fd = nfq_fd(h);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> ((rv = recv(fd, buf, <span class="keyword">sizeof</span>(buf), <span class="number">0</span>)) &amp;&amp; rv &gt;= <span class="number">0</span>) &#123;</span><br><span class="line">        nfq_handle_packet(h, buf, rv);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Unbinding from queue 0\n&quot;</span>);</span><br><span class="line">    nfq_destroy_queue(qh);</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Closing library handle\n&quot;</span>);</span><br><span class="line">    nfq_close(h);</span><br><span class="line"></span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="编译代码"><a href="#编译代码" class="headerlink" title="编译代码"></a>编译代码</h3><p>将上述代码保存为 <code>firewall.c</code>，然后编译它：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">gcc -o firewall firewall.c -lnetfilter_queue</span><br></pre></td></tr></table></figure>
+
+<h3 id="设置-iptables-规则"><a href="#设置-iptables-规则" class="headerlink" title="设置 iptables 规则"></a>设置 iptables 规则</h3><p>为了让 <code>iptables</code> 将数据包传递到 <code>NFQUEUE</code>，使用以下命令：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo iptables -I INPUT -j NFQUEUE --queue-num 0</span><br><span class="line">sudo iptables -I OUTPUT -j NFQUEUE --queue-num 0</span><br></pre></td></tr></table></figure>
+
+<h3 id="运行防火墙"><a href="#运行防火墙" class="headerlink" title="运行防火墙"></a>运行防火墙</h3><p>运行编译后的防火墙程序：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo ./firewall</span><br></pre></td></tr></table></figure>
+
+<h3 id="测试防火墙"><a href="#测试防火墙" class="headerlink" title="测试防火墙"></a>测试防火墙</h3><ol>
+<li><p><strong>允许 ICMP 包（如 ping）</strong>：</p>
+<p> 打开一个终端，运行 <code>ping</code> 命令：</p>
+ <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ping 8.8.8.8</span><br></pre></td></tr></table></figure>
+
+<p> 你应该看到 <code>ping</code> 包被允许通过。</p>
+</li>
+<li><p><strong>允许 TCP 包</strong>：</p>
+<p> 打开一个终端，运行 <code>curl</code> 命令：</p>
+ <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">curl http://example.com</span><br></pre></td></tr></table></figure>
+
+<p> 你应该看到 <code>curl</code> 请求被允许通过。</p>
+</li>
+<li><p><strong>拒绝其他包</strong>：</p>
+<p> 所有其他类型的数据包将被拒绝。</p>
+</li>
+</ol>
+<h3 id="清理"><a href="#清理" class="headerlink" title="清理"></a>清理</h3><p>完成测试后，清理 <code>iptables</code> 规则：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo iptables -D INPUT -j NFQUEUE --queue-num 0</span><br><span class="line">sudo iptables -D OUTPUT -j NFQUEUE --queue-num 0</span><br></pre></td></tr></table></figure>
+
+<p>这就是一个简单的包过滤防火墙的实现，利用 <code>libnetfilter_queue</code> 来处理和过滤数据包。你可以根据需要进一步扩展和修改此代码以实现更复杂的防火墙功能。</p>
+<p>要测试 <code>iptables</code> 防火墙规则，确认其是否正确拒绝和允许指定的服务，可以进行以下步骤：</p>
+<h3 id="1-检查允许的服务"><a href="#1-检查允许的服务" class="headerlink" title="1. 检查允许的服务"></a>1. 检查允许的服务</h3><p><strong>允许的服务包括：</strong></p>
+<ul>
+<li>本地回环接口流量</li>
+<li>已建立和相关的连接</li>
+<li>SSH (端口 22)</li>
+<li>ICMP (ping)</li>
+<li>HTTP (端口 80) 和 HTTPS (端口 443)</li>
+</ul>
+<h4 id="测试-SSH-连接"><a href="#测试-SSH-连接" class="headerlink" title="测试 SSH 连接"></a>测试 SSH 连接</h4><p>在本地或远程系统上，尝试通过 SSH 连接到配置了防火墙的机器：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ssh user@your_server_ip</span><br></pre></td></tr></table></figure>
+<p>应能够成功连接。</p>
+<h4 id="测试-HTTP-和-HTTPS"><a href="#测试-HTTP-和-HTTPS" class="headerlink" title="测试 HTTP 和 HTTPS"></a>测试 HTTP 和 HTTPS</h4><p>在本地或远程系统上，使用 <code>curl</code> 或浏览器访问 HTTP 和 HTTPS 服务：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">curl http://your_server_ip</span><br><span class="line">curl https://your_server_ip</span><br></pre></td></tr></table></figure>
+<p>应返回相应的网页内容或响应头。</p>
+<h4 id="测试-ICMP-ping"><a href="#测试-ICMP-ping" class="headerlink" title="测试 ICMP (ping)"></a>测试 ICMP (ping)</h4><p>在本地或远程系统上，尝试 ping 配置了防火墙的机器：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ping your_server_ip</span><br></pre></td></tr></table></figure>
+<p>应接收到来自目标机器的响应。</p>
+<h3 id="2-检查拒绝的服务"><a href="#2-检查拒绝的服务" class="headerlink" title="2. 检查拒绝的服务"></a>2. 检查拒绝的服务</h3><p><strong>未特别允许的服务应被拒绝。</strong></p>
+<h4 id="测试其他端口"><a href="#测试其他端口" class="headerlink" title="测试其他端口"></a>测试其他端口</h4><p>尝试访问未允许的端口（例如，端口 23），应该被拒绝：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">telnet your_server_ip 23</span><br></pre></td></tr></table></figure>
+<p>或使用 <code>nc</code> (netcat)：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">nc -zv your_server_ip 23</span><br></pre></td></tr></table></figure>
+<p>应显示连接被拒绝或超时。</p>
+<h3 id="3-使用日志检查拒绝的服务"><a href="#3-使用日志检查拒绝的服务" class="headerlink" title="3. 使用日志检查拒绝的服务"></a>3. 使用日志检查拒绝的服务</h3><p>防火墙脚本包含日志记录规则，可以通过系统日志检查被拒绝的连接：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo <span class="built_in">tail</span> -f /var/log/syslog</span><br></pre></td></tr></table></figure>
+<p>或在某些系统上：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo journalctl -f</span><br></pre></td></tr></table></figure>
+<p>尝试连接未允许的服务，并在日志中查看记录的 <code>IPTABLES-DROP</code> 消息。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>以下是一个完整的测试步骤：</p>
+<ol>
+<li><p><strong>测试允许的服务</strong>：</p>
+<ul>
+<li>SSH 连接：  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ssh user@your_server_ip</span><br></pre></td></tr></table></figure></li>
+<li>HTTP 和 HTTPS 访问：  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">curl http://your_server_ip</span><br><span class="line">curl https://your_server_ip</span><br></pre></td></tr></table></figure></li>
+<li>ICMP (ping)：  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">ping your_server_ip</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p><strong>测试拒绝的服务</strong>：</p>
+<ul>
+<li>其他端口访问：  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">telnet your_server_ip 23</span><br><span class="line">nc -zv your_server_ip 23</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p><strong>查看系统日志</strong>：</p>
+<ul>
+<li>检查日志以确认拒绝的服务被记录：  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo <span class="built_in">tail</span> -f /var/log/syslog</span><br></pre></td></tr></table></figure>
+  或  <figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo journalctl -f</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+</ol>
+<p>通过这些测试，你可以确认防火墙规则是否正确应用，并确保只允许指定的服务。</p>
+]]></content>
   </entry>
   <entry>
     <title>运算符优先级</title>

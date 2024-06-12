@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=2">
+<meta name="theme-color" content="#222">
+<meta name="generator" content="Hexo 6.3.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon-next.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/images/favicon-32x32-next.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/images/favicon-16x16-next.png">
+  <link rel="mask-icon" href="/images/logo.svg" color="#222">
+
+<link rel="stylesheet" href="/css/main.css">
+
+
+<link rel="stylesheet" href="/lib/font-awesome/css/all.min.css">
+
+<script id="hexo-configurations">
+    var NexT = window.NexT || {};
+    var CONFIG = {"hostname":"zhendewokusi.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":20,"offset":40,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn","display":"always"}},"path":"search.xml"};
+  </script>
+
+  <meta name="description" content="中断种类1. 外部中断外部中断又可以细分为可屏蔽中断和不可屏蔽中断。 2. 内部中断内部中断可以分为软中断和异常。软中断是由软件主动发起的中断，并不是发生了某种错误。发起软中断的指令：  int 8位立即数。常用于系统调用，可表示256种中断。 int3。调试断点指令，中断向量号是3。我们常用的gdb或者bochs调试实际上就是使用到了这个指令。运行gdb的进程fork一个子进程用来运行被调试的程">
+<meta property="og:type" content="article">
+<meta property="og:title" content="中断">
+<meta property="og:url" content="http://zhendewokusi.github.io/2024/02/07/%E4%B8%AD%E6%96%AD/index.html">
+<meta property="og:site_name" content="元芳你怎么看">
+<meta property="og:description" content="中断种类1. 外部中断外部中断又可以细分为可屏蔽中断和不可屏蔽中断。 2. 内部中断内部中断可以分为软中断和异常。软中断是由软件主动发起的中断，并不是发生了某种错误。发起软中断的指令：  int 8位立即数。常用于系统调用，可表示256种中断。 int3。调试断点指令，中断向量号是3。我们常用的gdb或者bochs调试实际上就是使用到了这个指令。运行gdb的进程fork一个子进程用来运行被调试的程">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/%E4%B8%AA%E4%BA%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BA%A7%E8%81%94.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/8259A%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/ICW1.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/ICW2.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/%E4%B8%BB%E7%89%87ICW3.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/%E4%BB%8E%E7%89%87ICW3.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/ICW4.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/OCW1.png">
+<meta property="og:image" content="http://zhendewokusi.github.io/image/OCW2.png">
+<meta property="article:published_time" content="2024-02-07T14:13:33.000Z">
+<meta property="article:modified_time" content="2024-02-18T14:48:35.048Z">
+<meta property="article:author" content="zhendewokusi">
+<meta property="article:tag" content="真相还原">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="http://zhendewokusi.github.io/image/%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B.png">
+
+<link rel="canonical" href="http://zhendewokusi.github.io/2024/02/07/%E4%B8%AD%E6%96%AD/">
+
+
+<script id="page-configurations">
+  // https://hexo.io/docs/variables.html
+  CONFIG.page = {
+    sidebar: "",
+    isHome : false,
+    isPost : true,
+    lang   : 'zh-CN'
+  };
+</script>
+
+  <title>中断 | 元芳你怎么看</title>
+  
+
+
+
+
+
+
+  <noscript>
+  <style>
+  .use-motion .brand,
+  .use-motion .menu-item,
+  .sidebar-inner,
+  .use-motion .post-block,
+  .use-motion .pagination,
+  .use-motion .comments,
+  .use-motion .post-header,
+  .use-motion .post-body,
+  .use-motion .collection-header { opacity: initial; }
+
+  .use-motion .site-title,
+  .use-motion .site-subtitle {
+    opacity: initial;
+    top: initial;
+  }
+
+  .use-motion .logo-line-before i { left: initial; }
+  .use-motion .logo-line-after i { right: initial; }
+  </style>
+</noscript>
+
+<style>.darkmode--activated{--body-bg-color:#282828;--content-bg-color:#333;--card-bg-color:#555;--text-color:#ccc;--blockquote-color:#bbb;--link-color:#ccc;--link-hover-color:#eee;--brand-color:#ddd;--brand-hover-color:#ddd;--table-row-odd-bg-color:#282828;--table-row-hover-bg-color:#363636;--menu-item-bg-color:#555;--btn-default-bg:#222;--btn-default-color:#ccc;--btn-default-border-color:#555;--btn-default-hover-bg:#666;--btn-default-hover-color:#ccc;--btn-default-hover-border-color:#666;--highlight-background:#282b2e;--highlight-foreground:#a9b7c6;--highlight-gutter-background:#34393d;--highlight-gutter-foreground:#9ca9b6}.darkmode--activated img{opacity:.75}.darkmode--activated img:hover{opacity:.9}.darkmode--activated code{color:#69dbdc;background:0 0}button.darkmode-toggle{z-index:9999}.darkmode-ignore,img{display:flex!important}.beian img{display:inline-block!important}</style></head>
+
+<body itemscope itemtype="http://schema.org/WebPage">
+  <div class="container use-motion">
+    <div class="headband"></div>
+
+    <header class="header" itemscope itemtype="http://schema.org/WPHeader">
+      <div class="header-inner"><div class="site-brand-container">
+  <div class="site-nav-toggle">
+    <div class="toggle" aria-label="切换导航栏">
+      <span class="toggle-line toggle-line-first"></span>
+      <span class="toggle-line toggle-line-middle"></span>
+      <span class="toggle-line toggle-line-last"></span>
+    </div>
+  </div>
+
+  <div class="site-meta">
+
+    <a href="/" class="brand" rel="start">
+      <span class="logo-line-before"><i></i></span>
+      <h1 class="site-title">元芳你怎么看</h1>
+      <span class="logo-line-after"><i></i></span>
+    </a>
+      <p class="site-subtitle" itemprop="description">本网站主要用于记录我个人学习的内容,希望对你有所帮助</p>
+  </div>
+
+  <div class="site-nav-right">
+    <div class="toggle popup-trigger">
+    </div>
+  </div>
+</div>
+
+
+
+
+<nav class="site-nav">
+  <ul id="menu" class="main-menu menu">
+        <li class="menu-item menu-item-home">
+
+    <a href="/" rel="section"><i class="fa fa-home fa-fw"></i>首页</a>
+
+  </li>
+        <li class="menu-item menu-item-archives">
+
+    <a href="/archives/" rel="section"><i class="fa fa-archive fa-fw"></i>归档</a>
+
+  </li>
+        <li class="menu-item menu-item-tags">
+
+    <a href="/tags/" rel="section"><i class="fa fa-tags fa-fw"></i>标签</a>
+
+  </li>
+        <li class="menu-item menu-item-friends">
+
+    <a href="/friends/" rel="section"><i class="fa fa-link fa-fw"></i>友链</a>
+
+  </li>
+        <li class="menu-item menu-item-about">
+
+    <a href="/about/" rel="section"><i class="fa fa-user fa-fw"></i>关于</a>
+
+  </li>
+  </ul>
+</nav>
+
+
+
+
+</div>
+    </header>
+
+    
+  <div class="back-to-top">
+    <i class="fa fa-arrow-up"></i>
+    <span>0%</span>
+  </div>
+  <div class="reading-progress-bar"></div>
+
+  <a href="https://github.com/zhendewokusi" class="github-corner" title="Follow me on GitHub" aria-label="Follow me on GitHub" rel="noopener" target="_blank"><svg width="80" height="80" viewBox="0 0 250 250" aria-hidden="true"><path d="M0,0 L115,115 L130,115 L142,142 L250,250 L250,0 Z"></path><path d="M128.3,109.0 C113.8,99.7 119.0,89.6 119.0,89.6 C122.0,82.7 120.5,78.6 120.5,78.6 C119.2,72.0 123.4,76.3 123.4,76.3 C127.3,80.9 125.5,87.3 125.5,87.3 C122.9,97.6 130.6,101.9 134.4,103.2" fill="currentColor" style="transform-origin: 130px 106px;" class="octo-arm"></path><path d="M115.0,115.0 C114.9,115.1 118.7,116.5 119.8,115.4 L133.7,101.6 C136.9,99.2 139.9,98.4 142.2,98.6 C133.8,88.0 127.5,74.4 143.8,58.0 C148.5,53.4 154.0,51.2 159.7,51.0 C160.3,49.4 163.2,43.6 171.4,40.1 C171.4,40.1 176.1,42.5 178.8,56.2 C183.1,58.6 187.2,61.8 190.9,65.4 C194.5,69.0 197.7,73.2 200.1,77.6 C213.8,80.2 216.3,84.9 216.3,84.9 C212.7,93.1 206.9,96.0 205.4,96.6 C205.1,102.4 203.0,107.8 198.3,112.5 C181.9,128.9 168.3,122.5 157.7,114.1 C157.9,116.9 156.7,120.9 152.7,124.9 L141.0,136.5 C139.8,137.7 141.6,141.9 141.8,141.8 Z" fill="currentColor" class="octo-body"></path></svg></a>
+
+
+    <main class="main">
+      <div class="main-inner">
+        <div class="content-wrap">
+          
+
+          <div class="content post posts-expand">
+            
+
+    
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/02/07/%E4%B8%AD%E6%96%AD/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h1 class="post-title" itemprop="name headline">
+          中断
+        </h1>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-02-07 22:13:33" itemprop="dateCreated datePublished" datetime="2024-02-07T22:13:33+08:00">2024-02-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2024-02-18 22:48:35" itemprop="dateModified" datetime="2024-02-18T22:48:35+08:00">2024-02-18</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+        <h2 id="中断种类"><a href="#中断种类" class="headerlink" title="中断种类"></a>中断种类</h2><h3 id="1-外部中断"><a href="#1-外部中断" class="headerlink" title="1. 外部中断"></a>1. 外部中断</h3><p>外部中断又可以细分为可屏蔽中断和不可屏蔽中断。</p>
+<h3 id="2-内部中断"><a href="#2-内部中断" class="headerlink" title="2. 内部中断"></a>2. 内部中断</h3><p>内部中断可以分为<strong>软中断</strong>和<strong>异常</strong>。<br>软中断是由软件<strong>主动</strong>发起的中断，并不是发生了某种错误。<br>发起软中断的指令：</p>
+<ul>
+<li><code>int 8位立即数</code>。常用于系统调用，可表示256种中断。</li>
+<li><code>int3</code>。调试断点指令，中断向量号是3。我们常用的<code>gdb</code>或者<code>bochs</code>调试实际上就是使用到了这个指令。运行<code>gdb</code>的进程fork一个子进程用来运行被调试的程序，调试器打断点的本质是：将对应断点的地址的第一个字节备份并更改为<code>0xcc</code>，这样程序运行到断点处就会触发中断处理程序，运行中断处理程序之前要将当前的寄存器等数据压栈保存，查看寄存器或者变量实际上是从栈中获取的。</li>
+<li><code>into</code>。中断溢出指令，中断向量号是4。在<code>eflags</code>寄存器的<code>OF</code>位为1的前提下触发中断。</li>
+<li><code>bound</code>。数组索引越界检查指令，中断向量号是5。指令格式<code>bound 16/32位 内存/寄存器</code>，如果数据访问越界，则触发该中断。</li>
+<li><code>ud2</code>。未定义指令，中断向量号是6。表示该指令CPU无法识别。</li>
+</ul>
+<p>除了第一个是软中断外，其余是软中断，也可以认为是异常。因为它们既具备软中断的“主动”行为,又具备异常的“错误”结果。</p>
+<p>异常可以分为三类：</p>
+<ol>
+<li>Fault（故障）。比如缺页中断，这类异常交给对应的异常处理程序很大概率会被修复，甚至对操作系统有益处。</li>
+<li>Trap(陷阱)。比如调试时候的<code>int3</code>，掉入了CPU设下的陷阱，很形象。</li>
+<li>Abort(终止)。这是最严重的异常，意味着不可修复，操作系统为了正常运行，会直接将其从进程表中删除。通常是硬件出错或者内核某些数据结构出错。</li>
+</ol>
+<h2 id="中断描述符表"><a href="#中断描述符表" class="headerlink" title="中断描述符表"></a>中断描述符表</h2><p>中断描述符表(Interrupt Descriptor Table,IDT)是保护模式下用于存储中断处理程序入口的表。由于操作系统是中断驱动的，实模式下存储中断的是中断向量表。</p>
+<p>中断向量表和中断描述符表的区别？</p>
+<ul>
+<li>中断描述符表地址不限制,在哪里都可以。</li>
+<li>中断描述符表中的每个描述符用 8 字节描述。</li>
+</ul>
+<h2 id="中断处理过程以及保护"><a href="#中断处理过程以及保护" class="headerlink" title="中断处理过程以及保护"></a>中断处理过程以及保护</h2><p>一个完整的中断包含CPU内部的CPU外部和CPU内部两个部分以及特权级的检查。</p>
+<p>CPU 外:外部设备的中断由中断代理芯片接收,处理后将该中断的中断向量号发送到 CPU。<br>CPU 内:CPU 执行该中断向量号对应的中断处理程序。</p>
+<p>这里只讨论CPU内部的过程：</p>
+<ol>
+<li><p>处理器根据中断向量号定位中断门描述符。</p>
+</li>
+<li><p>处理器进行特权级检查。当前的特权级CPL必须在门描述符DPL和门中代码段描述符DPL之间（防止用户主动调用只为内核服务的例程）。</p>
+<ol>
+<li>如果是由软中断 <code>int n</code>、<code>int3</code> 和 <code>into</code> 引发的中断,这些是用户进程中主动发起的中断,由用户代码控制,处理器要检查当前特权级 CPL 和门描述符 DPL,这是检查进门的特权下限,如果 CPL 权限大于等于 DPL,即数值上 CPL≤门描述符 DPL,特权级“门槛”检查通过,进入下一步的“门框”检查。否则,处理器抛出异常。</li>
+<li>这一步检查特权级的上限(门框):处理器要检查当前特权级 CPL 和门描述符中所记录的选择子对应的目标代码段 DPL,如果 CPL 权限小于目标代码段 DPL,即数值上 CPL&gt;目标代码段 DPL,检查通过。否则 CPL 若大于等于目标代码段 DPL,处理器将引发异常,也就是说,除了用返回指令从高特权级返回,特权转移只能发生在由低向高。</li>
+<li>若中断是由外部设备和异常引起的,只直接检查 CPL 和目标代码段的 DPL,和上面的步骤2是一样的,要求 CPL 权限小于目标代码段 DPL,即数值上 CPL &gt;目标代码段 DPL,否则处理器引发异常。</li>
+</ol>
+</li>
+<li><p>执行中断处理程序。</p>
+</li>
+</ol>
+<p><img src="/../image/%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B.png" alt="中断处理过程"></p>
+<p>由于IDT中会有中断门，陷阱门，任务门。中断发生时候会将NT位和TF位置为0。</p>
+<p>NT位和TF位：<br>当 NT 标志被设置为 1 时，表示允许任务嵌套。设置为0表示进入了中断处理程序。这里还有个作用，<code>iret</code>指令既可以从新任务返回到旧任务，也可以从中断返回，这里 NT 标志就是区分到底是哪种返回。<br>当 TF 标志被设置为 1 时，会启用单步调试模式。设置为0也很容易想到，中断程序怎么会让你单步调试捏。</p>
+<p>如果执行的是中断门时，会将IF位设置为0,避免中断嵌套，如果是陷阱门或者任务门则不会设置IF位为0，允许CPU响应更高级别的中断。当然也可以在中断处理程序中将IF位置为1,这样就可以处理优先级更高的中断。eflags寄存器有些位可以通过和栈配合来更改位，但是这有内存操作，效率低下且不是原子操作，所以专门给IF位提供了控制指令：<code>sti</code>开中断和<code>cli</code>关中断。IF 位(中断允许位)只能限制外部设备的中断,对那些影响系统正常运行的中断都无效,如异常 exception,软中断,如 int n 等,不可屏蔽中断 NMI 都不受 IF 限制。</p>
+<h3 id="中断发生时候的压栈"><a href="#中断发生时候的压栈" class="headerlink" title="中断发生时候的压栈"></a>中断发生时候的压栈</h3><p>布拉布拉….</p>
+<h2 id="可编程中断控制器-8259A"><a href="#可编程中断控制器-8259A" class="headerlink" title="可编程中断控制器 8259A"></a>可编程中断控制器 8259A</h2><p>最理想的方式是每个外设准备一个引脚接收中断，但是这明显不现实，成本高收益低。这时候一个中间层代理就显得智慧，这里使用的是Intel 8259A芯片。传统的PIC(就是可编程中断控制器 Programmable Interrupt Controller 的简称)是两片8259A风格的芯片级联的方式连接在一起。每个芯片可以处理8个不同的IRQ（中断请求）输入线，因为从PIC的INT输出线到主PIC的IRQ2引脚，因此可用的IRQ引脚只有<code>16 - 1</code>个。这种情况仅仅在系统只有一个CPU的情况下，将主芯片的输出引脚连接CPU的INTR引脚，但是系统有多个CPU就不适用了，引入了ACPI的新组件来代替老式的8259A芯片，这里只学习8259A芯片的原理和操作方式，不涉及多处理器的情况。<br>8259A可以管理和控制<strong>可屏蔽中断</strong>，它可以屏蔽外设中断，判断中断优先级，向CPU提供中断向量号，这些功能都是可编程的。 外接设备通过主板线路和8259A芯片连接在一起。下面是个人计算机中芯片级联方式：<br><img src="/../image/%E4%B8%AA%E4%BA%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BA%A7%E8%81%94.png" alt="级联"></p>
+<h3 id="内部结构"><a href="#内部结构" class="headerlink" title="内部结构"></a>内部结构</h3><ul>
+<li>INT: 芯片挑选出来优先级最高的中断请求，发信号给CPU。</li>
+<li>INTA: INT Acknowledge,中断响应信号。用于接收CPU的INTA接口的中断响应信号。</li>
+<li>IMR(Interrupt Mask Register): 中断屏蔽寄存器，8位，用来屏蔽某个外设的中断信号。</li>
+<li>IRR(Interrupt Request Register): 中断请求寄存器，8位，用来存储等待处理的中断。</li>
+<li>PR(Priority Resolver): 优先仲裁器，找出优先级最高的中断。</li>
+<li>ISR(In-Service Register): 中断服务寄存器，8位，存储正在处理的中断。</li>
+</ul>
+<p><img src="/../image/8259A%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84.png" alt="级联"></p>
+<h3 id="工作流程"><a href="#工作流程" class="headerlink" title="工作流程"></a>工作流程</h3><ol>
+<li>外设发出一个中断信号，通过主板线路将信号传递给芯片的某个IRQ接口。</li>
+<li>8259A首先检查IMR寄存器是否屏蔽了该IRQ接口的中断信号，如果为1则表示屏蔽，直接忽略。否则将其送入IRR寄存器，将其对应位置为1。</li>
+<li>PR寄存器找出优先级最高的中断（这里优先级判断很简单，IRQ接口接口号越低，优先级越大）。</li>
+<li>芯片在控制电路中通过INT接口向CPU发送INTR信号，信号传入CPU的INTR接口后，CPU就知道有新的中断到来，执行完手里的指令就向自己的INTA接口向8259A回复一个中断响应信号，表示CPU准备就绪。</li>
+<li>8259A受到信号后，将刚才选出来的优先级最高的中断在ISR中置为1,同时将IRR中置为0。</li>
+<li>CPU再次发送INTA信号，为了获取中断对应的中断向量号。</li>
+<li>如果8259A的EOI（End of Interrupt）被设置为手动模式，中断处理程序必须有向8259A发送EOI的代码，芯片受到EOI后会自动将ISR对应中断位置为0。</li>
+</ol>
+<p>需要注意的是：并不是进入了 ISR 后的中断就高枕无忧了,它还是有可能被后者换下来的。比如,在 8259A 发送中断向量号给 CPU 之前,这时候又来了新的中断,如果它的来源 IRQ 接口号比 ISR 中的低,也就是优先级更高,原来 ISR 中准备上 CPU 处理的旧中断,其对应的 BIT 就得清 0,同时将它所在的 IRR中的相应 BIT 恢复为 1,随后在 ISR 中将此优先级更高的新中断对应的 BIT 置 1,然后将此新中断的中断向量号发给 CPU。</p>
+<h3 id="实际操作"><a href="#实际操作" class="headerlink" title="实际操作"></a>实际操作</h3><p>说了那么多，我们最终目的很简单：</p>
+<ol>
+<li>构建IDT</li>
+<li>提供中断向量号</li>
+</ol>
+<p>8259A内部有两组寄存器：初始化命令寄存器组(ICW1 ~ ICW4)，操作命令寄存器组(OCW1 ~ OCW3)。因此我们的操作也分为初始化和操作两部分。</p>
+<h4 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h4><p>注意：ICW1 ~ ICW4的初始是有严格顺序的。必须依次写入 ICW1、ICW2、ICW3、ICW4。因为其中某些设置是由关联，依赖的。</p>
+<h5 id="ICW1"><a href="#ICW1" class="headerlink" title="ICW1"></a>ICW1</h5><p>用来初始化 8259A 的连接方式和中断信号的触发方式。连接方式是指用单片工作,还是用多片级联工作,触发方式是指中断请求信号是电平触发,还是边沿触发。</p>
+<p><img src="/../image/ICW1.png" alt="ICW1"></p>
+<p>IC4：表示是否写入ICW4,该位为1表示需要在后面写入ICW4,为0则不需要。x86必须设置为1。<br>SNGL：该位为1,表示是单片，为0则表示级联。<br>ADI：用来设置8259A的调用时间间隔，x86不需要设置。<br>LTIM：表示中断检测方式，为0表示边沿触发，为1表示电平触发。<br>第四位恒定为1。<br>第5~7位专用于8085处理器，x86不需要，设置为0。</p>
+<h5 id="ICW2"><a href="#ICW2" class="headerlink" title="ICW2"></a>ICW2</h5><p>用来设置起始中断向量号。需要写入主片的0x21端口和从片的0xA1端口。<br>我们只需要写高五位的T3~T7，所以任意数字都是8的倍数，这个数字便是设定的起始中断向量号。第三位可以表示8个中断向量号，这是根据8259A芯片自行导入，这样就能表示任意一个IQR接口实际分配的中断向量号。</p>
+<p><img src="/../image/ICW2.png" alt="ICW2"></p>
+<h5 id="ICW3"><a href="#ICW3" class="headerlink" title="ICW3"></a>ICW3</h5><p>在级联的前提下才能使用，用来设置主从片用哪个IRQ接口互联。需要写入主片的0x21端口和从片的0xA1端口。<br>对于主片，哪个IRQ接口用于连接从片，就将其设置为1（可以设置多个从片），设置为0表示是外接设备。<br>对于从片，只需要在从片上指定主片用于连接自己的IRQ接口。这样中断发生后，主片会发送与从片做级联的 IRQ 接口号,所有从片用自己的 ICW3 的低 3 位和它对比,若一致则认为是发给自己的。高五位没用到，设置为0。</p>
+<p><img src="/../image/%E4%B8%BB%E7%89%87ICW3.png" alt="ICW3主片"><br><img src="/../image/%E4%BB%8E%E7%89%87ICW3.png" alt="ICW3从片"></p>
+<h5 id="ICW4"><a href="#ICW4" class="headerlink" title="ICW4"></a>ICW4</h5><p><img src="/../image/ICW4.png" alt="ICW4"></p>
+<p>SFNM 表示特殊全嵌套模式(Special Fully Nested Mode) ,若 SFNM 为 0,则表示全嵌套模式,若 SFNM为 1,则表示特殊全嵌套模式。<br>BUF 表示本 8259A 芯片是否工作在缓冲模式。BUF 为 0,则工作非缓冲模式,BUF 为 1,则工作在缓冲模式。<br>当多个 8259A 级联时,如果工作在缓冲模式下,M&#x2F;S 用来规定本 8259A 是主片,还是从片。若 M&#x2F;S 为 1 ,则表示则表示是主片,若 M&#x2F;S 为 0,则表示是从片。若工作在非缓冲模式(BUF 为 0)下,M&#x2F;S 无效。<br>AEOI 表示自动结束中断(Auto End Of Interrupt) ,8259A 在收到中断结束信号时才能继续处理下一个中断,此项用来设置是否要让 8259A 自动把中断结束。若 AEOI 为 0,则表示非自动,即手动结束中断,咱们可以在中断处理程序中或主函数中手动向 8259A 的主、从片发送 EOI 信号。这种“操作”类命令,通过下面要介绍的 OCW 进行。若 AEOI 为 1,则表示自动结束中断。<br>μPM 表示微处理器类型(microprocessor) ,此项是为了兼容老处理器。若 μPM 为 0,则表示 8080 或8085 处理器,若 μPM 为 1,则表示 x86 处理器。</p>
+<h4 id="OCW"><a href="#OCW" class="headerlink" title="OCW"></a>OCW</h4><h5 id="OCW1"><a href="#OCW1" class="headerlink" title="OCW1"></a>OCW1</h5><p><img src="/../image/OCW1.png" alt="OCW1"></p>
+<p>需要写入主片的0x21端口和从片的0xA1端口。<br>OCW1 用来屏蔽连接在 8259A 上的外部设备的中断信号，还记得上面说的IMR(Interrupt Mask Register)吗？实际上就是将OCW1的数据填入该寄存器中。为1表示该位被屏蔽。</p>
+<h5 id="OCW2"><a href="#OCW2" class="headerlink" title="OCW2"></a>OCW2</h5><p><img src="/../image/OCW2.png" alt="OCW2"></p>
+<p>OCW2 要写入到主片的 0x20 及从片的 0xA0 端口。<br>OCW2 用来设置中断结束方式和优先级模式。</p>
+<p>SL：Specific Level,表示是否指定优先等级。等级是用低 3 位来指定的。此处的 SL 只是开启低 3 位的开关,所以 SL 也表示低 3 位的 L2~L0 是否有效。SL 为 1 表示有效,SL 为 0 表示无效。</p>
+<p>OCW2 其中的一个作用就是发 EOI 信号结束中断。如果使 SL 为 1,可以用 OCW2 的低 3 位(L2<del>L0)来指定位于 ISR 寄存器中的哪一个中断被终止,也就是结束来自哪个 IRQ 接口的中断信号。如果 SL 位为 0,L2</del>L0 便不起作用了,8259A 会自动将正在处理的中断结束,也就是把 ISR 寄存器中优先级最高的位清 0。</p>
+<p>R：用来设置优先级控制方式。为0，则IRQ接口号越低，优先级越高。<br>R为1:设置为循环优先级方式。</p>
+<ol>
+<li>SL为0，初始优先级次序为IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5&gt;IR6&gt;IR7。</li>
+<li>SL为1,通过 L2<del>L1 指定最低优先级是哪个 IRQ 接口。<br>举个例子,在 R 和 SL 都等于 1 的情况下,若想指定 IR5 为最低的优先级,需要将 L2</del>L0 置为 101。<br>这样,新的初始优先级循环是:IR6&gt;IR7&gt;IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5。什么是循环优先级方式？当前 IR6 为最高级别中断请求,处理完成后,IR6 将变成最低级别,IR7 变成最高级别,这一组循环之后的优先级变成了:IR7&gt;IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5&gt;IR6。</li>
+</ol>
+<p>EOI：End Of Interrupt,为中断结束命令位。令 EOI 为 1,则会令 ISR 寄存器中的相应位清 0,也就是<br>将当前处理的中断清掉,表示处理结束。向 8259A 主动发送 EOI 是手工结束中断的做法,所以,使用此<br>命令有个前提,就是 ICW4 中的 AEOI 位为 0,非自动结束中断时才用。</p>
+<p>只有EOI位为1时候，表示发送中断结束。</p>
+<p>OCW3用于设定特殊的屏蔽方式以及查询方式。</p>
+<h4 id="编写中断处理程序"><a href="#编写中断处理程序" class="headerlink" title="编写中断处理程序"></a>编写中断处理程序</h4><p>中断向量 0<del>19 为处理器内部固定的异常类型,20</del>31 是 Intel 保留的，所以咱们可用的中断向量号最低是 32,将来咱们在设置 8259A 的时候,会把 IR0 的中断向量号设置为 32。</p>
+
+    </div>
+
+    
+    
+    
+
+      <footer class="post-footer">
+          <div class="post-tags">
+              <a href="/tags/%E7%9C%9F%E7%9B%B8%E8%BF%98%E5%8E%9F/" rel="tag"># 真相还原</a>
+          </div>
+
+        
+
+
+        
+    <div class="post-nav">
+      <div class="post-nav-item">
+    <a href="/2024/02/04/DPL-CPL-RPL/" rel="prev" title="DPL CPL RPL 门">
+      <i class="fa fa-chevron-left"></i> DPL CPL RPL 门
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2024/05/19/%E7%AE%80%E5%8D%95%E9%98%B2%E7%81%AB%E5%A2%99/" rel="next" title="简单防火墙">
+      简单防火墙 <i class="fa fa-chevron-right"></i>
+    </a></div>
+    </div>
+      </footer>
+    
+  </article>
+  
+  
+  
+
+
+
+          </div>
+          
+
+<script>
+  window.addEventListener('tabs:register', () => {
+    let { activeClass } = CONFIG.comments;
+    if (CONFIG.comments.storage) {
+      activeClass = localStorage.getItem('comments_active') || activeClass;
+    }
+    if (activeClass) {
+      let activeTab = document.querySelector(`a[href="#comment-${activeClass}"]`);
+      if (activeTab) {
+        activeTab.click();
+      }
+    }
+  });
+  if (CONFIG.comments.storage) {
+    window.addEventListener('tabs:click', event => {
+      if (!event.target.matches('.tabs-comment .tab-content .tab-pane')) return;
+      let commentClass = event.target.classList[1];
+      localStorage.setItem('comments_active', commentClass);
+    });
+  }
+</script>
+
+        </div>
+          
+  
+  <div class="toggle sidebar-toggle">
+    <span class="toggle-line toggle-line-first"></span>
+    <span class="toggle-line toggle-line-middle"></span>
+    <span class="toggle-line toggle-line-last"></span>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-inner">
+
+      <ul class="sidebar-nav motion-element">
+        <li class="sidebar-nav-toc">
+          文章目录
+        </li>
+        <li class="sidebar-nav-overview">
+          站点概览
+        </li>
+      </ul>
+
+      <!--noindex-->
+      <div class="post-toc-wrap sidebar-panel">
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E7%A7%8D%E7%B1%BB"><span class="nav-number">1.</span> <span class="nav-text">中断种类</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#1-%E5%A4%96%E9%83%A8%E4%B8%AD%E6%96%AD"><span class="nav-number">1.1.</span> <span class="nav-text">1. 外部中断</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#2-%E5%86%85%E9%83%A8%E4%B8%AD%E6%96%AD"><span class="nav-number">1.2.</span> <span class="nav-text">2. 内部中断</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E6%8F%8F%E8%BF%B0%E7%AC%A6%E8%A1%A8"><span class="nav-number">2.</span> <span class="nav-text">中断描述符表</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B%E4%BB%A5%E5%8F%8A%E4%BF%9D%E6%8A%A4"><span class="nav-number">3.</span> <span class="nav-text">中断处理过程以及保护</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E4%B8%AD%E6%96%AD%E5%8F%91%E7%94%9F%E6%97%B6%E5%80%99%E7%9A%84%E5%8E%8B%E6%A0%88"><span class="nav-number">3.1.</span> <span class="nav-text">中断发生时候的压栈</span></a></li></ol></li><li class="nav-item nav-level-2"><a class="nav-link" href="#%E5%8F%AF%E7%BC%96%E7%A8%8B%E4%B8%AD%E6%96%AD%E6%8E%A7%E5%88%B6%E5%99%A8-8259A"><span class="nav-number">4.</span> <span class="nav-text">可编程中断控制器 8259A</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84"><span class="nav-number">4.1.</span> <span class="nav-text">内部结构</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%A8%8B"><span class="nav-number">4.2.</span> <span class="nav-text">工作流程</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#%E5%AE%9E%E9%99%85%E6%93%8D%E4%BD%9C"><span class="nav-number">4.3.</span> <span class="nav-text">实际操作</span></a><ol class="nav-child"><li class="nav-item nav-level-4"><a class="nav-link" href="#%E5%88%9D%E5%A7%8B%E5%8C%96"><span class="nav-number">4.3.1.</span> <span class="nav-text">初始化</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#ICW1"><span class="nav-number">4.3.1.1.</span> <span class="nav-text">ICW1</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ICW2"><span class="nav-number">4.3.1.2.</span> <span class="nav-text">ICW2</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ICW3"><span class="nav-number">4.3.1.3.</span> <span class="nav-text">ICW3</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#ICW4"><span class="nav-number">4.3.1.4.</span> <span class="nav-text">ICW4</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#OCW"><span class="nav-number">4.3.2.</span> <span class="nav-text">OCW</span></a><ol class="nav-child"><li class="nav-item nav-level-5"><a class="nav-link" href="#OCW1"><span class="nav-number">4.3.2.1.</span> <span class="nav-text">OCW1</span></a></li><li class="nav-item nav-level-5"><a class="nav-link" href="#OCW2"><span class="nav-number">4.3.2.2.</span> <span class="nav-text">OCW2</span></a></li></ol></li><li class="nav-item nav-level-4"><a class="nav-link" href="#%E7%BC%96%E5%86%99%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E7%A8%8B%E5%BA%8F"><span class="nav-number">4.3.3.</span> <span class="nav-text">编写中断处理程序</span></a></li></ol></li></ol></li></ol></div>
+      </div>
+      <!--/noindex-->
+
+      <div class="site-overview-wrap sidebar-panel">
+        <div class="site-author motion-element" itemprop="author" itemscope itemtype="http://schema.org/Person">
+    <img class="site-author-image" itemprop="image" alt="zhendewokusi"
+      src="/images/avatar.gif">
+  <p class="site-author-name" itemprop="name">zhendewokusi</p>
+  <div class="site-description" itemprop="description">琼楼挂月钓流云，梦里瑶台暂借春</div>
+</div>
+<div class="site-state-wrap motion-element">
+  <nav class="site-state">
+      <div class="site-state-item site-state-posts">
+          <a href="/archives/">
+        
+          <span class="site-state-item-count">23</span>
+          <span class="site-state-item-name">日志</span>
+        </a>
+      </div>
+      <div class="site-state-item site-state-tags">
+            <a href="/tags/">
+          
+        <span class="site-state-item-count">10</span>
+        <span class="site-state-item-name">标签</span></a>
+      </div>
+  </nav>
+</div>
+  <div class="links-of-author motion-element">
+      <span class="links-of-author-item">
+        <a href="https://github.com/zhendewokusi" title="GitHub → https:&#x2F;&#x2F;github.com&#x2F;zhendewokusi" rel="noopener" target="_blank"><i class="fab fa-github fa-fw"></i>GitHub</a>
+      </span>
+      <span class="links-of-author-item">
+        <a href="mailto:768672249@qq.com" title="E-Mail → mailto:768672249@qq.com" rel="noopener" target="_blank"><i class="fa fa-envelope fa-fw"></i>E-Mail</a>
+      </span>
+  </div>
+
+
+
+      </div>
+
+    </div>
+  </aside>
+  <div id="sidebar-dimmer"></div>
+
+
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        
+
+        
+
+<div class="copyright">
+  
+  &copy; 
+  <span itemprop="copyrightYear">2024</span>
+  <span class="with-love">
+    <i class="fa fa-heart"></i>
+  </span>
+  <span class="author" itemprop="copyrightHolder">zhendewokusi</span>
+</div>
+  <div class="powered-by">由 <a href="https://hexo.io/" class="theme-link" rel="noopener" target="_blank">Hexo</a> & <a href="https://theme-next.org/" class="theme-link" rel="noopener" target="_blank">NexT.Gemini</a> 强力驱动
+  </div>
+
+        
+
+
+
+
+
+
+
+
+      </div>
+    </footer>
+  </div>
+
+  
+  <script src="/lib/anime.min.js"></script>
+  <script src="/lib/pjax/pjax.min.js"></script>
+  <script src="//cdn.jsdelivr.net/npm/pangu@4/dist/browser/pangu.min.js"></script>
+  <script src="/lib/velocity/velocity.min.js"></script>
+  <script src="/lib/velocity/velocity.ui.min.js"></script>
+
+<script src="/js/utils.js"></script>
+
+<script src="/js/motion.js"></script>
+
+
+<script src="/js/schemes/pisces.js"></script>
+
+
+<script src="/js/next-boot.js"></script>
+
+  <script>
+var pjax = new Pjax({
+  selectors: [
+    'head title',
+    '#page-configurations',
+    '.content-wrap',
+    '.post-toc-wrap',
+    '.languages',
+    '#pjax'
+  ],
+  switches: {
+    '.post-toc-wrap': Pjax.switches.innerHTML
+  },
+  analytics: false,
+  cacheBust: false,
+  scrollTo : !CONFIG.bookmark.enable
+});
+
+window.addEventListener('pjax:success', () => {
+  document.querySelectorAll('script[data-pjax], script#page-configurations, #pjax script').forEach(element => {
+    var code = element.text || element.textContent || element.innerHTML || '';
+    var parent = element.parentNode;
+    parent.removeChild(element);
+    var script = document.createElement('script');
+    if (element.id) {
+      script.id = element.id;
+    }
+    if (element.className) {
+      script.className = element.className;
+    }
+    if (element.type) {
+      script.type = element.type;
+    }
+    if (element.src) {
+      script.src = element.src;
+      // Force synchronous loading of peripheral JS.
+      script.async = false;
+    }
+    if (element.dataset.pjax !== undefined) {
+      script.dataset.pjax = '';
+    }
+    if (code !== '') {
+      script.appendChild(document.createTextNode(code));
+    }
+    parent.appendChild(script);
+  });
+  NexT.boot.refresh();
+  // Define Motion Sequence & Bootstrap Motion.
+  if (CONFIG.motion.enable) {
+    NexT.motion.integrator
+      .init()
+      .add(NexT.motion.middleWares.subMenu)
+      .add(NexT.motion.middleWares.postList)
+      .bootstrap();
+  }
+  NexT.utils.updateSidebarPosition();
+});
+</script>
+
+
+
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <div id="pjax">
+  
+
+  
+
+
+  <script async src="/js/love.min.js"></script>
+
+    </div>
+<script src="/live2dw/lib/L2Dwidget.min.js?094cbace49a39548bed64abff5988b05"></script><script>L2Dwidget.init({"pluginRootPath":"live2dw/","pluginJsPath":"lib/","pluginModelPath":"assets/","tagMode":false,"debug":false,"model":{"jsonPath":"/live2dw/assets/wanko.model.json"},"display":{"position":"left","width":100,"height":200},"mobile":{"show":false},"log":false});</script></body>
+</html>

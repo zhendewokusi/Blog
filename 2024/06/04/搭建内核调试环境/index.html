@@ -20,20 +20,20 @@
     var CONFIG = {"hostname":"zhendewokusi.github.io","root":"/","scheme":"Gemini","version":"7.8.0","exturl":false,"sidebar":{"position":"left","display":"post","padding":20,"offset":40,"onmobile":false},"copycode":{"enable":true,"show_result":true,"style":"mac"},"back2top":{"enable":true,"sidebar":false,"scrollpercent":true},"bookmark":{"enable":false,"color":"#222","save":"auto"},"fancybox":false,"mediumzoom":false,"lazyload":false,"pangu":true,"comments":{"style":"tabs","active":null,"storage":true,"lazyload":false,"nav":null},"algolia":{"hits":{"per_page":10},"labels":{"input_placeholder":"Search for Posts","hits_empty":"We didn't find any results for the search: ${query}","hits_stats":"${hits} results found in ${time} ms"}},"localsearch":{"enable":false,"trigger":"auto","top_n_per_article":1,"unescape":false,"preload":false},"motion":{"enable":true,"async":false,"transition":{"post_block":"fadeIn","post_header":"slideDownIn","post_body":"slideDownIn","coll_header":"slideLeftIn","sidebar":"slideUpIn","display":"always"}},"path":"search.xml"};
   </script>
 
-  <meta name="description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub.">
+  <meta name="description" content="下载 linux 源码，v6.10-rc2 在项目根目录下执行 make menuconfig  配置Kernel hacking  —&gt;    Compile-time checks and compiler options  —&gt;        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;">
 <meta property="og:type" content="article">
-<meta property="og:title" content="Hello World">
-<meta property="og:url" content="http://zhendewokusi.github.io/2023/10/02/hello-world/index.html">
+<meta property="og:title" content="搭建内核调试环境">
+<meta property="og:url" content="http://zhendewokusi.github.io/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/index.html">
 <meta property="og:site_name" content="元芳你怎么看">
-<meta property="og:description" content="Welcome to Hexo! This is your very first post. Check documentation for more info. If you get any problems when using Hexo, you can find the answer in troubleshooting or you can ask me on GitHub.">
+<meta property="og:description" content="下载 linux 源码，v6.10-rc2 在项目根目录下执行 make menuconfig  配置Kernel hacking  —&gt;    Compile-time checks and compiler options  —&gt;        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;">
 <meta property="og:locale" content="zh_CN">
-<meta property="article:published_time" content="2023-10-02T14:04:13.000Z">
-<meta property="article:modified_time" content="2024-02-06T14:27:07.625Z">
+<meta property="article:published_time" content="2024-06-04T14:22:47.000Z">
+<meta property="article:modified_time" content="2024-06-05T13:56:37.418Z">
 <meta property="article:author" content="zhendewokusi">
-<meta property="article:tag" content="hexo">
+<meta property="article:tag" content="内核">
 <meta name="twitter:card" content="summary">
 
-<link rel="canonical" href="http://zhendewokusi.github.io/2023/10/02/hello-world/">
+<link rel="canonical" href="http://zhendewokusi.github.io/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/">
 
 
 <script id="page-configurations">
@@ -46,7 +46,7 @@
   };
 </script>
 
-  <title>Hello World | 元芳你怎么看</title>
+  <title>搭建内核调试环境 | 元芳你怎么看</title>
   
 
 
@@ -170,7 +170,7 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/10/02/hello-world/">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
       <meta itemprop="image" content="/images/avatar.gif">
@@ -183,7 +183,7 @@
     </span>
       <header class="post-header">
         <h1 class="post-title" itemprop="name headline">
-          Hello World
+          搭建内核调试环境
         </h1>
 
         <div class="post-meta">
@@ -193,14 +193,14 @@
               </span>
               <span class="post-meta-item-text">发表于</span>
 
-              <time title="创建时间：2023-10-02 22:04:13" itemprop="dateCreated datePublished" datetime="2023-10-02T22:04:13+08:00">2023-10-02</time>
+              <time title="创建时间：2024-06-04 22:22:47" itemprop="dateCreated datePublished" datetime="2024-06-04T22:22:47+08:00">2024-06-04</time>
             </span>
               <span class="post-meta-item">
                 <span class="post-meta-item-icon">
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
+                <time title="修改时间：2024-06-05 21:56:37" itemprop="dateModified" datetime="2024-06-05T21:56:37+08:00">2024-06-05</time>
               </span>
 
           
@@ -214,19 +214,20 @@
     <div class="post-body" itemprop="articleBody">
 
       
-        <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.<span id="more"></span></p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+        <ol>
+<li>下载 linux 源码，v6.10-rc2</li>
+<li>在项目根目录下执行 <code>make menuconfig</code></li>
+</ol>
+<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>Kernel hacking  —&gt;<br>    Compile-time checks and compiler options  —&gt;<br>        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;<br>            (X) Generate DWARF Version 5 debuginfo </p>
+<pre><code>[*] Provide GDB scripts for kernel debugging 
+</code></pre>
+<p>make -j8</p>
+<p>busybox 1.36.1</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">code scripts/kconfig/lxdialog/Makefile</span><br><span class="line"><span class="meta"># always		:= $(hostprogs-y) dochecklxdialog</span></span><br></pre></td></tr></table></figure>
 
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">make menuconfig</span><br><span class="line"></span><br></pre></td></tr></table></figure>
 
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+<p>[*] Build static binary (no shared libs)  </p>
 
     </div>
 
@@ -236,7 +237,7 @@
 
       <footer class="post-footer">
           <div class="post-tags">
-              <a href="/tags/hexo/" rel="tag"># hexo</a>
+              <a href="/tags/%E5%86%85%E6%A0%B8/" rel="tag"># 内核</a>
           </div>
 
         
@@ -244,10 +245,13 @@
 
         
     <div class="post-nav">
-      <div class="post-nav-item"></div>
       <div class="post-nav-item">
-    <a href="/2023/10/09/%E6%9D%A1%E6%AC%BE21/" rel="next" title="条款 21 :优先选用 std::make_unique 和std::make_shared, 而非直接使用 new">
-      条款 21 :优先选用 std::make_unique 和std::make_shared, 而非直接使用 new <i class="fa fa-chevron-right"></i>
+    <a href="/2024/06/04/slab-%E5%88%86%E9%85%8D%E5%99%A8/" rel="prev" title="slab 分配器">
+      <i class="fa fa-chevron-left"></i> slab 分配器
+    </a></div>
+      <div class="post-nav-item">
+    <a href="/2024/06/08/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BADPDK-1/" rel="next" title="深入浅出DPDK-1">
+      深入浅出DPDK-1 <i class="fa fa-chevron-right"></i>
     </a></div>
     </div>
       </footer>
@@ -307,7 +311,7 @@
 
       <!--noindex-->
       <div class="post-toc-wrap sidebar-panel">
-          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#Quick-Start"><span class="nav-number">1.</span> <span class="nav-text">Quick Start</span></a><ol class="nav-child"><li class="nav-item nav-level-3"><a class="nav-link" href="#Create-a-new-post"><span class="nav-number">1.1.</span> <span class="nav-text">Create a new post</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Run-server"><span class="nav-number">1.2.</span> <span class="nav-text">Run server</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Generate-static-files"><span class="nav-number">1.3.</span> <span class="nav-text">Generate static files</span></a></li><li class="nav-item nav-level-3"><a class="nav-link" href="#Deploy-to-remote-sites"><span class="nav-number">1.4.</span> <span class="nav-text">Deploy to remote sites</span></a></li></ol></li></ol></div>
+          <div class="post-toc motion-element"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#%E9%85%8D%E7%BD%AE"><span class="nav-number">1.</span> <span class="nav-text">配置</span></a></li></ol></div>
       </div>
       <!--/noindex-->
 
@@ -323,14 +327,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-count">23</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-count">10</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

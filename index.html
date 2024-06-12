@@ -167,6 +167,701 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/09/DPDK-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/06/09/DPDK-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE/" class="post-title-link" itemprop="url">DPDK 环境配置</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-06-09 22:56:38" itemprop="dateCreated datePublished" datetime="2024-06-09T22:56:38+08:00">2024-06-09</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2024-06-10 20:09:51" itemprop="dateModified" datetime="2024-06-10T20:09:51+08:00">2024-06-10</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="环境配置"><a href="#环境配置" class="headerlink" title="环境配置"></a>环境配置</h1><h3 id="DPDK系统要求："><a href="#DPDK系统要求：" class="headerlink" title="DPDK系统要求："></a>DPDK系统要求：</h3><p>Kernel version &gt;&#x3D; 4.14<br>GCC（版本 5.0+）或 Clang（版本 3.6+）<br>Python 3.6 或更高版本<br>Meson (version 0.53.2+) and ninja<br>pyelftools （版本 0.22+）</p>
+<h3 id="笔者环境："><a href="#笔者环境：" class="headerlink" title="笔者环境："></a>笔者环境：</h3><p>内核版本： 6.6.32-1-lts<br>发行版： ArchLinux<br>gcc 版本 14.1.1 20240522<br>Python 3.12.3<br>Meson 1.4.1<br>pyelftools 0.31-2</p>
+<h3 id="环境配置-1"><a href="#环境配置-1" class="headerlink" title="环境配置"></a>环境配置</h3><ol>
+<li>检查当前内核是否支持</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment"># 查看当前内核是否支持</span></span><br><span class="line">zgrep -E <span class="string">&quot;HUGETLBFS|PROC_PAGE_MONITOR&quot;</span> /proc/config.gz</span><br><span class="line">CONFIG_PROC_PAGE_MONITOR=y</span><br><span class="line">CONFIG_HUGETLBFS=y</span><br><span class="line"><span class="comment"># 查看高精度事件定时器</span></span><br><span class="line">zgrep -E <span class="string">&quot;HPET&quot;</span> /proc/config.gz     </span><br><span class="line">CONFIG_HPET_TIMER=y</span><br><span class="line">CONFIG_HPET_EMULATE_RTC=y</span><br><span class="line">CONFIG_HPET=y</span><br><span class="line"><span class="comment"># CONFIG_HPET_MMAP is not set</span></span><br></pre></td></tr></table></figure>
+
+<p>如果不支持<code>HUGETLBFS</code>或者<code>PROC_PAGE_MONITOR</code>，重编内核。</p>
+<ol start="2">
+<li>安装上述环境</li>
+</ol>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo pacman -S gcc clang pkgconf python meson ninja python-pyelftools numactl</span><br><span class="line">sudo pacman -S libarchive libelf</span><br></pre></td></tr></table></figure>
+
+<ol start="3">
+<li>配置大页</li>
+</ol>
+<p>最简单的配置，只使用2MB的大页，没有配置1GB的，如果有需要可以官网查教程。</p>
+<p>非root用户使用<code>sudo vim</code>操作下面文件填写自己认为适合的数值，不太离谱都行。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">echo</span> 1024 &gt; /sys/kernel/mm/hugepages/hugepages-2048kB/nr_hugepages</span><br></pre></td></tr></table></figure>
+
+<p>HugePages_Total不为0就代表成功。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">➜  ~ <span class="built_in">cat</span> /proc/meminfo | grep Huge</span><br><span class="line">AnonHugePages:   3670016 kB</span><br><span class="line">ShmemHugePages:        0 kB</span><br><span class="line">FileHugePages:    190464 kB</span><br><span class="line">HugePages_Total:    1024</span><br><span class="line">HugePages_Free:     1024</span><br><span class="line">HugePages_Rsvd:        0</span><br><span class="line">HugePages_Surp:        0</span><br><span class="line">Hugepagesize:       2048 kB</span><br><span class="line">Hugetlb:         2097152 kB</span><br></pre></td></tr></table></figure>
+
+<h3 id="编译安装"><a href="#编译安装" class="headerlink" title="编译安装"></a>编译安装</h3><p>下载一个自己喜欢的DPDK版本，懒得话就：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">git <span class="built_in">clone</span> http://dpdk.org/git/dpdk --depth=1</span><br></pre></td></tr></table></figure>
+
+<p>进入项目主目录:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">meson setup build</span><br><span class="line"><span class="built_in">cd</span> build</span><br><span class="line">ninja</span><br><span class="line">sudo meson install</span><br></pre></td></tr></table></figure>
+
+<p>编译安装完成后，查看路径<code>/usr/local/lib/pkgconfig</code>有无<code>和libdpdk.pc</code>，没有的话全局找一下该文件路径，并且在<code>~/.zshrc</code>添加<code>export PKG_CONFIG_PATH=/path/to/</code>，我本机设置<code>export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig</code>，完成后进行下面命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo ldconfig</span><br></pre></td></tr></table></figure>
+
+<h1 id="Hello-World"><a href="#Hello-World" class="headerlink" title="Hello World"></a>Hello World</h1><p>简单运行一下：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">cd</span> examples/helloworld</span><br><span class="line">make</span><br><span class="line"><span class="built_in">cd</span> build</span><br><span class="line">sudo ./helloworld</span><br></pre></td></tr></table></figure>
+
+<p>Output:</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br></pre></td><td class="code"><pre><span class="line">➜  build git:(main) sudo ./helloworld</span><br><span class="line">EAL: Detected CPU lcores: 16</span><br><span class="line">EAL: Detected NUMA nodes: 1</span><br><span class="line">EAL: Detected shared linkage of DPDK</span><br><span class="line">EAL: Multi-process socket /var/run/dpdk/rte/mp_socket</span><br><span class="line">EAL: Selected IOVA mode <span class="string">&#x27;VA&#x27;</span></span><br><span class="line">TELEMETRY: No legacy callbacks, legacy socket not created</span><br><span class="line">hello from core 1</span><br><span class="line">hello from core 2</span><br><span class="line">hello from core 3</span><br><span class="line">hello from core 4</span><br><span class="line">hello from core 5</span><br><span class="line">hello from core 6</span><br><span class="line">hello from core 7</span><br><span class="line">hello from core 8</span><br><span class="line">hello from core 9</span><br><span class="line">hello from core 10</span><br><span class="line">hello from core 11</span><br><span class="line">hello from core 12</span><br><span class="line">hello from core 13</span><br><span class="line">hello from core 14</span><br><span class="line">hello from core 15</span><br><span class="line">hello from core 0</span><br></pre></td></tr></table></figure>
+
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/08/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BADPDK-1/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/06/08/%E6%B7%B1%E5%85%A5%E6%B5%85%E5%87%BADPDK-1/" class="post-title-link" itemprop="url">深入浅出DPDK-1</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2024-06-08 13:06:10 / 修改时间：18:32:34" itemprop="dateCreated datePublished" datetime="2024-06-08T13:06:10+08:00">2024-06-08</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>该文章仅用于个人阅读笔记使用，如有错误，敬请指正。</p>
+<h1 id="什么是DPDK？"><a href="#什么是DPDK？" class="headerlink" title="什么是DPDK？"></a>什么是DPDK？</h1><p>什么是DPDK?对于用户来说,它可能是一个性能出色的包数据处理加速软件库;对于开发者来说,它可能是一个实践包处理新想法的创新工场;对于性能调优者来说,它可能又是一个绝佳的成果分享平台。当下火热的网络功能虚拟化,则将DPDK放在一个重要的基石位置。</p>
+<p>DPDK最初的动机很简单,就是证明IA多核处理器能够支撑高性能数据包处理。随着早期目标的达成和更多通用处理器体系的加入,DPDK逐渐成为通用多核处理器高性能数据包处理的业界标杆。</p>
+<h2 id="IA不适合进行数据包处理吗？"><a href="#IA不适合进行数据包处理吗？" class="headerlink" title="IA不适合进行数据包处理吗？"></a>IA不适合进行数据包处理吗？</h2><p>Linux系统为例，内核栈处理数据包流程：</p>
+<ol>
+<li>数据包到达网卡。</li>
+<li>网卡通过DMA将数据包复制到内存中的接收缓冲区。</li>
+<li>网卡发送中断信号通知CPU有新的数据包到达。</li>
+<li>中断处理程序被触发，处理该中断。</li>
+<li>驱动程序将数据包从网卡的接收缓冲区移到内核的网络栈中，并将其放入适当的队列中。</li>
+<li>内核网络栈对数据包进行处理（例如，协议栈处理，IP、TCP&#x2F;UDP等）。</li>
+<li>根据数据包的目的地，内核决定下一步操作：<ul>
+<li>如果数据包需要在内核态进行处理，则直接在内核态处理。</li>
+<li>如果数据包需要由用户态应用程序处理，则内核将数据包放入相应的套接字缓冲区中。</li>
+</ul>
+</li>
+<li>用户态应用程序通过系统调用读取数据包，数据从内核态（CPU）复制到用户态的缓冲区中，然后进行处理。</li>
+</ol>
+<p>在网络带宽向万兆发展时，大量的中断操作会严重降低处理性能。当然Linux操作系统对此也提出了<code>NAPI</code>机制，NAPI 是 Linux 上采用的一种提高网络处理效率的技术，它的核心概念就是不采用中断的方式读取数据，而代之以首先采用中断唤醒数据接收的服务程序，然后 POLL 的方法来轮询数据。以此来减少中断；问题是数据还需要做一次 CPU copy，复制操作也是很大的性能开销。对此也有处理方案，就是<code>Netmap</code>，使用共享数据包池减少这次CPU copy；还有问题：Linux是分时操作系统，需要进行进&#x2F;线程进行对应的调度操作，那么它们的上下文切换以及<code>cache miss</code>和 <code>cache write back</code>也会对极致的网络性能带来影响。</p>
+<h2 id="DPDK预取"><a href="#DPDK预取" class="headerlink" title="DPDK预取"></a>DPDK预取</h2><p><img src="/image.png" alt="alt text"></p>
+<p>在DPDK运行的时候,会使用mmap()系统调用把大页映射到用户态的虚拟地址空间,然后就可以正常使用了。</p>
+<h3 id="DDIO"><a href="#DDIO" class="headerlink" title="DDIO"></a>DDIO</h3><p>DDIO技术之前是如何进行处理网络数据的：当一个网络报文送到服务器的网卡时,网卡通过外部总线(比如PCI总线)把数据和报文描述符送到内存。接着,CPU从内存读取数据到Cache进而到寄存器。进行处理之后,再写回到Cache,并最终送到内存中。最后,网卡读取内存数据,经过外部总线送到网卡内部,最终通过网络接口发送出去。</p>
+<p>DDIO技术是如何改进的呢?这种技术使外部网卡和CPU通过LLCCache直接交换数据,绕过了内存这个相对慢速的部件。这样,就增加了CPU处理网络报文的速度(减少了CPU和网卡等待内存的时间),减小了网络报文在服务器端的处理延迟。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/" class="post-title-link" itemprop="url">搭建内核调试环境</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-06-04 22:22:47" itemprop="dateCreated datePublished" datetime="2024-06-04T22:22:47+08:00">2024-06-04</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2024-06-05 21:56:37" itemprop="dateModified" datetime="2024-06-05T21:56:37+08:00">2024-06-05</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <ol>
+<li>下载 linux 源码，v6.10-rc2</li>
+<li>在项目根目录下执行 <code>make menuconfig</code></li>
+</ol>
+<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>Kernel hacking  —&gt;<br>    Compile-time checks and compiler options  —&gt;<br>        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;<br>            (X) Generate DWARF Version 5 debuginfo </p>
+<pre><code>[*] Provide GDB scripts for kernel debugging 
+</code></pre>
+<p>make -j8</p>
+<p>busybox 1.36.1</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line">code scripts/kconfig/lxdialog/Makefile</span><br><span class="line"><span class="meta"># always		:= $(hostprogs-y) dochecklxdialog</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">make menuconfig</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>[*] Build static binary (no shared libs)  </p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/04/slab-%E5%88%86%E9%85%8D%E5%99%A8/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/06/04/slab-%E5%88%86%E9%85%8D%E5%99%A8/" class="post-title-link" itemprop="url">slab 分配器</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2024-06-04 20:27:35 / 修改时间：21:00:44" itemprop="dateCreated datePublished" datetime="2024-06-04T20:27:35+08:00">2024-06-04</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文是阅读 kernel 文档中关于 Slab 分配器的文档所写的笔记。</p>
+<p>slab分配器背后的基本思想：让常用对象的缓存保持在初始化状态供给内核使用。</p>
+<h2 id="slab-分配器的三个主要目标"><a href="#slab-分配器的三个主要目标" class="headerlink" title="slab 分配器的三个主要目标"></a>slab 分配器的三个主要目标</h2><ol>
+<li>分配小内存块有助于消除由伙伴系统引起的内部碎片。slab内部维护了两组小内存缓冲区的缓存，范围从32字节到131072（2的17次方）字节。</li>
+<li>缓存常用的对象，使系统不会浪费时间分配、初始化和销毁对象。当创建一个新的slab时，将很多对象进行打包并且进行初始化；当对象被释放，它保持其初始化状态，以便于下一次的对象分配。</li>
+<li>通过将对象与L1与L2缓存对齐，更好利用硬件缓存。这是slab的最本质的任务，如果一个对象打包进slab后还有剩余空间，slab就将其进行着色，使其与CPU L1缓存对齐。</li>
+</ol>
+<h2 id="主体"><a href="#主体" class="headerlink" title="主体"></a>主体</h2><p> slabs_full 的所有对象都在使用中。 slabs_partial 中有空闲对象，因此是分配对象的主要候选者。 slabs_free 没有分配的对象，是slab 销毁的主要候选者。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// The slab lists for all objects.</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">kmem_cache_node</span> &#123;</span></span><br><span class="line">	<span class="type">spinlock_t</span> list_lock;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLAB</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_partial</span>;</span>	<span class="comment">/* partial list first, better asm code */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_full</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_free</span>;</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> total_slabs;	<span class="comment">/* length of all slab lists */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_slabs;	<span class="comment">/* length of free slab list only */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_objects;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> free_limit;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> colour_next;	<span class="comment">/* Per-node cache coloring */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">array_cache</span> *<span class="title">shared</span>;</span>	<span class="comment">/* shared per node */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">alien_cache</span> **<span class="title">alien</span>;</span>	<span class="comment">/* on other nodes */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> next_reap;	<span class="comment">/* updated without locking */</span></span><br><span class="line">	<span class="type">int</span> free_touched;		<span class="comment">/* updated without locking */</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> nr_partial;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">partial</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB_DEBUG</span></span><br><span class="line">	<span class="type">atomic_long_t</span> nr_slabs;</span><br><span class="line">	<span class="type">atomic_long_t</span> total_objects;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">full</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/04/%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97%E6%B7%BB%E5%8A%A0/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/06/04/%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97%E6%B7%BB%E5%8A%A0/" class="post-title-link" itemprop="url">内核模块添加</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2024-06-04 18:07:34 / 修改时间：20:21:10" itemprop="dateCreated datePublished" datetime="2024-06-04T18:07:34+08:00">2024-06-04</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/05/19/%E7%AE%80%E5%8D%95%E9%98%B2%E7%81%AB%E5%A2%99/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/05/19/%E7%AE%80%E5%8D%95%E9%98%B2%E7%81%AB%E5%A2%99/" class="post-title-link" itemprop="url">简单防火墙</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-05-19 23:47:33" itemprop="dateCreated datePublished" datetime="2024-05-19T23:47:33+08:00">2024-05-19</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2024-05-20 00:09:32" itemprop="dateModified" datetime="2024-05-20T00:09:32+08:00">2024-05-20</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <p>写一个简单的包过滤防火墙涉及到使用 <code>netfilter</code> 框架，<code>netfilter</code> 是 Linux 内核中的一个子系统，用于处理和过滤网络数据包。我们可以使用 <code>iptables</code> 来设置规则，但如果我们想要自己编写代码，则需要编写一个内核模块或使用 <code>libnetfilter_queue</code> 来处理用户空间的包过滤。这里我们使用 <code>libnetfilter_queue</code> 库来编写一个简单的包过滤防火墙。</p>
+<h3 id="环境设置"><a href="#环境设置" class="headerlink" title="环境设置"></a>环境设置</h3><p>首先，确保你已经安装了必要的库和开发包。可以使用以下命令安装它们：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo apt-get install libnetfilter-queue-dev</span><br></pre></td></tr></table></figure>
+
+<h3 id="防火墙代码"><a href="#防火墙代码" class="headerlink" title="防火墙代码"></a>防火墙代码</h3><p>下面是一个简单的 C 代码示例，使用 <code>libnetfilter_queue</code> 来过滤数据包。这个防火墙只允许 ICMP（如 ping）和 TCP 数据包通过，拒绝其他类型的数据包。</p>
+<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdlib.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;unistd.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;netinet/ip.h&gt;</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;linux/netfilter.h&gt;</span>        <span class="comment">/* for NF_ACCEPT */</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;libnetfilter_queue/libnetfilter_queue.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">/* Callback function to process packets */</span></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">cb</span><span class="params">(<span class="keyword">struct</span> nfq_q_handle *qh, <span class="keyword">struct</span> nfgenmsg *nfmsg,</span></span><br><span class="line"><span class="params">              <span class="keyword">struct</span> nfq_data *nfa, <span class="type">void</span> *data)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfqnl_msg_packet_hdr</span> *<span class="title">ph</span>;</span></span><br><span class="line">    <span class="type">unsigned</span> <span class="type">char</span> *payload;</span><br><span class="line">    <span class="type">int</span> id = <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">    ph = nfq_get_msg_packet_hdr(nfa);</span><br><span class="line">    <span class="keyword">if</span> (ph) &#123;</span><br><span class="line">        id = ntohl(ph-&gt;packet_id);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="type">int</span> ret = nfq_get_payload(nfa, &amp;payload);</span><br><span class="line">    <span class="keyword">if</span> (ret &gt;= <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="class"><span class="keyword">struct</span> <span class="title">iphdr</span> *<span class="title">ip_header</span> =</span> (<span class="keyword">struct</span> iphdr *)payload;</span><br><span class="line">        <span class="keyword">if</span> (ip_header-&gt;protocol == IPPROTO_ICMP || ip_header-&gt;protocol == IPPROTO_TCP) &#123;</span><br><span class="line">            <span class="comment">// Allow ICMP and TCP packets</span></span><br><span class="line">            <span class="keyword">return</span> nfq_set_verdict(qh, id, NF_ACCEPT, <span class="number">0</span>, <span class="literal">NULL</span>);</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// Drop all other packets</span></span><br><span class="line">    <span class="keyword">return</span> nfq_set_verdict(qh, id, NF_DROP, <span class="number">0</span>, <span class="literal">NULL</span>);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">(<span class="type">int</span> argc, <span class="type">char</span> **argv)</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfq_handle</span> *<span class="title">h</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfq_q_handle</span> *<span class="title">qh</span>;</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">nfnl_handle</span> *<span class="title">nh</span>;</span></span><br><span class="line">    <span class="type">int</span> fd;</span><br><span class="line">    <span class="type">int</span> rv;</span><br><span class="line">    <span class="type">char</span> buf[<span class="number">4096</span>] __attribute__ ((aligned));</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Opening library handle\n&quot;</span>);</span><br><span class="line">    h = nfq_open();</span><br><span class="line">    <span class="keyword">if</span> (!h) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_open()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Unbinding existing nf_queue handler for AF_INET (if any)\n&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (nfq_unbind_pf(h, AF_INET) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_unbind_pf()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Binding nfnetlink_queue as nf_queue handler for AF_INET\n&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (nfq_bind_pf(h, AF_INET) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_bind_pf()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Binding this socket to queue &#x27;0&#x27;\n&quot;</span>);</span><br><span class="line">    qh = nfq_create_queue(h,  <span class="number">0</span>, &amp;cb, <span class="literal">NULL</span>);</span><br><span class="line">    <span class="keyword">if</span> (!qh) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Error during nfq_create_queue()\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Setting copy_packet mode\n&quot;</span>);</span><br><span class="line">    <span class="keyword">if</span> (nfq_set_mode(qh, NFQNL_COPY_PACKET, <span class="number">0xffff</span>) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">        <span class="built_in">fprintf</span>(<span class="built_in">stderr</span>, <span class="string">&quot;Can&#x27;t set packet_copy mode\n&quot;</span>);</span><br><span class="line">        <span class="built_in">exit</span>(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    fd = nfq_fd(h);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">while</span> ((rv = recv(fd, buf, <span class="keyword">sizeof</span>(buf), <span class="number">0</span>)) &amp;&amp; rv &gt;= <span class="number">0</span>) &#123;</span><br><span class="line">        nfq_handle_packet(h, buf, rv);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Unbinding from queue 0\n&quot;</span>);</span><br><span class="line">    nfq_destroy_queue(qh);</span><br><span class="line"></span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;Closing library handle\n&quot;</span>);</span><br><span class="line">    nfq_close(h);</span><br><span class="line"></span><br><span class="line">    <span class="built_in">exit</span>(<span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h3 id="编译代码"><a href="#编译代码" class="headerlink" title="编译代码"></a>编译代码</h3><p>将上述代码保存为 <code>firewall.c</code>，然后编译它：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">gcc -o firewall firewall.c -lnetfilter_queue</span><br></pre></td></tr></table></figure>
+
+<h3 id="设置-iptables-规则"><a href="#设置-iptables-规则" class="headerlink" title="设置 iptables 规则"></a>设置 iptables 规则</h3><p>为了让 <code>iptables</code> 将数据包传递到 <code>NFQUEUE</code>，使用以下命令：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo iptables -I INPUT -j NFQUEUE --queue-num 0</span><br><span class="line">sudo iptables -I OUTPUT -j NFQUEUE --queue-num 0</span><br></pre></td></tr></table></figure>
+
+<h3 id="运行防火墙"><a href="#运行防火墙" class="headerlink" title="运行防火墙"></a>运行防火墙</h3><p>运行编译后的防火墙程序：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo ./firewall</span><br></pre></td></tr></table></figure>
+
+<h3 id="测试防火墙"><a href="#测试防火墙" class="headerlink" title="测试防火墙"></a>测试防火墙</h3><ol>
+<li><p><strong>允许 ICMP 包（如 ping）</strong>：</p>
+<p> 打开一个终端，运行 <code>ping</code> 命令：</p>
+ <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ping 8.8.8.8</span><br></pre></td></tr></table></figure>
+
+<p> 你应该看到 <code>ping</code> 包被允许通过。</p>
+</li>
+<li><p><strong>允许 TCP 包</strong>：</p>
+<p> 打开一个终端，运行 <code>curl</code> 命令：</p>
+ <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">curl http://example.com</span><br></pre></td></tr></table></figure>
+
+<p> 你应该看到 <code>curl</code> 请求被允许通过。</p>
+</li>
+<li><p><strong>拒绝其他包</strong>：</p>
+<p> 所有其他类型的数据包将被拒绝。</p>
+</li>
+</ol>
+<h3 id="清理"><a href="#清理" class="headerlink" title="清理"></a>清理</h3><p>完成测试后，清理 <code>iptables</code> 规则：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">sudo iptables -D INPUT -j NFQUEUE --queue-num 0</span><br><span class="line">sudo iptables -D OUTPUT -j NFQUEUE --queue-num 0</span><br></pre></td></tr></table></figure>
+
+<p>这就是一个简单的包过滤防火墙的实现，利用 <code>libnetfilter_queue</code> 来处理和过滤数据包。你可以根据需要进一步扩展和修改此代码以实现更复杂的防火墙功能。</p>
+<p>要测试 <code>iptables</code> 防火墙规则，确认其是否正确拒绝和允许指定的服务，可以进行以下步骤：</p>
+<h3 id="1-检查允许的服务"><a href="#1-检查允许的服务" class="headerlink" title="1. 检查允许的服务"></a>1. 检查允许的服务</h3><p><strong>允许的服务包括：</strong></p>
+<ul>
+<li>本地回环接口流量</li>
+<li>已建立和相关的连接</li>
+<li>SSH (端口 22)</li>
+<li>ICMP (ping)</li>
+<li>HTTP (端口 80) 和 HTTPS (端口 443)</li>
+</ul>
+<h4 id="测试-SSH-连接"><a href="#测试-SSH-连接" class="headerlink" title="测试 SSH 连接"></a>测试 SSH 连接</h4><p>在本地或远程系统上，尝试通过 SSH 连接到配置了防火墙的机器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh user@your_server_ip</span><br></pre></td></tr></table></figure>
+<p>应能够成功连接。</p>
+<h4 id="测试-HTTP-和-HTTPS"><a href="#测试-HTTP-和-HTTPS" class="headerlink" title="测试 HTTP 和 HTTPS"></a>测试 HTTP 和 HTTPS</h4><p>在本地或远程系统上，使用 <code>curl</code> 或浏览器访问 HTTP 和 HTTPS 服务：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl http://your_server_ip</span><br><span class="line">curl https://your_server_ip</span><br></pre></td></tr></table></figure>
+<p>应返回相应的网页内容或响应头。</p>
+<h4 id="测试-ICMP-ping"><a href="#测试-ICMP-ping" class="headerlink" title="测试 ICMP (ping)"></a>测试 ICMP (ping)</h4><p>在本地或远程系统上，尝试 ping 配置了防火墙的机器：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ping your_server_ip</span><br></pre></td></tr></table></figure>
+<p>应接收到来自目标机器的响应。</p>
+<h3 id="2-检查拒绝的服务"><a href="#2-检查拒绝的服务" class="headerlink" title="2. 检查拒绝的服务"></a>2. 检查拒绝的服务</h3><p><strong>未特别允许的服务应被拒绝。</strong></p>
+<h4 id="测试其他端口"><a href="#测试其他端口" class="headerlink" title="测试其他端口"></a>测试其他端口</h4><p>尝试访问未允许的端口（例如，端口 23），应该被拒绝：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">telnet your_server_ip 23</span><br></pre></td></tr></table></figure>
+<p>或使用 <code>nc</code> (netcat)：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">nc -zv your_server_ip 23</span><br></pre></td></tr></table></figure>
+<p>应显示连接被拒绝或超时。</p>
+<h3 id="3-使用日志检查拒绝的服务"><a href="#3-使用日志检查拒绝的服务" class="headerlink" title="3. 使用日志检查拒绝的服务"></a>3. 使用日志检查拒绝的服务</h3><p>防火墙脚本包含日志记录规则，可以通过系统日志检查被拒绝的连接：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo <span class="built_in">tail</span> -f /var/log/syslog</span><br></pre></td></tr></table></figure>
+<p>或在某些系统上：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo journalctl -f</span><br></pre></td></tr></table></figure>
+<p>尝试连接未允许的服务，并在日志中查看记录的 <code>IPTABLES-DROP</code> 消息。</p>
+<h3 id="总结"><a href="#总结" class="headerlink" title="总结"></a>总结</h3><p>以下是一个完整的测试步骤：</p>
+<ol>
+<li><p><strong>测试允许的服务</strong>：</p>
+<ul>
+<li>SSH 连接：  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ssh user@your_server_ip</span><br></pre></td></tr></table></figure></li>
+<li>HTTP 和 HTTPS 访问：  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">curl http://your_server_ip</span><br><span class="line">curl https://your_server_ip</span><br></pre></td></tr></table></figure></li>
+<li>ICMP (ping)：  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">ping your_server_ip</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p><strong>测试拒绝的服务</strong>：</p>
+<ul>
+<li>其他端口访问：  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">telnet your_server_ip 23</span><br><span class="line">nc -zv your_server_ip 23</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+<li><p><strong>查看系统日志</strong>：</p>
+<ul>
+<li>检查日志以确认拒绝的服务被记录：  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo <span class="built_in">tail</span> -f /var/log/syslog</span><br></pre></td></tr></table></figure>
+  或  <figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">sudo journalctl -f</span><br></pre></td></tr></table></figure></li>
+</ul>
+</li>
+</ol>
+<p>通过这些测试，你可以确认防火墙规则是否正确应用，并确保只允许指定的服务。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/02/07/%E4%B8%AD%E6%96%AD/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/02/07/%E4%B8%AD%E6%96%AD/" class="post-title-link" itemprop="url">中断</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-02-07 22:13:33" itemprop="dateCreated datePublished" datetime="2024-02-07T22:13:33+08:00">2024-02-07</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2024-02-18 22:48:35" itemprop="dateModified" datetime="2024-02-18T22:48:35+08:00">2024-02-18</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="中断种类"><a href="#中断种类" class="headerlink" title="中断种类"></a>中断种类</h2><h3 id="1-外部中断"><a href="#1-外部中断" class="headerlink" title="1. 外部中断"></a>1. 外部中断</h3><p>外部中断又可以细分为可屏蔽中断和不可屏蔽中断。</p>
+<h3 id="2-内部中断"><a href="#2-内部中断" class="headerlink" title="2. 内部中断"></a>2. 内部中断</h3><p>内部中断可以分为<strong>软中断</strong>和<strong>异常</strong>。<br>软中断是由软件<strong>主动</strong>发起的中断，并不是发生了某种错误。<br>发起软中断的指令：</p>
+<ul>
+<li><code>int 8位立即数</code>。常用于系统调用，可表示256种中断。</li>
+<li><code>int3</code>。调试断点指令，中断向量号是3。我们常用的<code>gdb</code>或者<code>bochs</code>调试实际上就是使用到了这个指令。运行<code>gdb</code>的进程fork一个子进程用来运行被调试的程序，调试器打断点的本质是：将对应断点的地址的第一个字节备份并更改为<code>0xcc</code>，这样程序运行到断点处就会触发中断处理程序，运行中断处理程序之前要将当前的寄存器等数据压栈保存，查看寄存器或者变量实际上是从栈中获取的。</li>
+<li><code>into</code>。中断溢出指令，中断向量号是4。在<code>eflags</code>寄存器的<code>OF</code>位为1的前提下触发中断。</li>
+<li><code>bound</code>。数组索引越界检查指令，中断向量号是5。指令格式<code>bound 16/32位 内存/寄存器</code>，如果数据访问越界，则触发该中断。</li>
+<li><code>ud2</code>。未定义指令，中断向量号是6。表示该指令CPU无法识别。</li>
+</ul>
+<p>除了第一个是软中断外，其余是软中断，也可以认为是异常。因为它们既具备软中断的“主动”行为,又具备异常的“错误”结果。</p>
+<p>异常可以分为三类：</p>
+<ol>
+<li>Fault（故障）。比如缺页中断，这类异常交给对应的异常处理程序很大概率会被修复，甚至对操作系统有益处。</li>
+<li>Trap(陷阱)。比如调试时候的<code>int3</code>，掉入了CPU设下的陷阱，很形象。</li>
+<li>Abort(终止)。这是最严重的异常，意味着不可修复，操作系统为了正常运行，会直接将其从进程表中删除。通常是硬件出错或者内核某些数据结构出错。</li>
+</ol>
+<h2 id="中断描述符表"><a href="#中断描述符表" class="headerlink" title="中断描述符表"></a>中断描述符表</h2><p>中断描述符表(Interrupt Descriptor Table,IDT)是保护模式下用于存储中断处理程序入口的表。由于操作系统是中断驱动的，实模式下存储中断的是中断向量表。</p>
+<p>中断向量表和中断描述符表的区别？</p>
+<ul>
+<li>中断描述符表地址不限制,在哪里都可以。</li>
+<li>中断描述符表中的每个描述符用 8 字节描述。</li>
+</ul>
+<h2 id="中断处理过程以及保护"><a href="#中断处理过程以及保护" class="headerlink" title="中断处理过程以及保护"></a>中断处理过程以及保护</h2><p>一个完整的中断包含CPU内部的CPU外部和CPU内部两个部分以及特权级的检查。</p>
+<p>CPU 外:外部设备的中断由中断代理芯片接收,处理后将该中断的中断向量号发送到 CPU。<br>CPU 内:CPU 执行该中断向量号对应的中断处理程序。</p>
+<p>这里只讨论CPU内部的过程：</p>
+<ol>
+<li><p>处理器根据中断向量号定位中断门描述符。</p>
+</li>
+<li><p>处理器进行特权级检查。当前的特权级CPL必须在门描述符DPL和门中代码段描述符DPL之间（防止用户主动调用只为内核服务的例程）。</p>
+<ol>
+<li>如果是由软中断 <code>int n</code>、<code>int3</code> 和 <code>into</code> 引发的中断,这些是用户进程中主动发起的中断,由用户代码控制,处理器要检查当前特权级 CPL 和门描述符 DPL,这是检查进门的特权下限,如果 CPL 权限大于等于 DPL,即数值上 CPL≤门描述符 DPL,特权级“门槛”检查通过,进入下一步的“门框”检查。否则,处理器抛出异常。</li>
+<li>这一步检查特权级的上限(门框):处理器要检查当前特权级 CPL 和门描述符中所记录的选择子对应的目标代码段 DPL,如果 CPL 权限小于目标代码段 DPL,即数值上 CPL&gt;目标代码段 DPL,检查通过。否则 CPL 若大于等于目标代码段 DPL,处理器将引发异常,也就是说,除了用返回指令从高特权级返回,特权转移只能发生在由低向高。</li>
+<li>若中断是由外部设备和异常引起的,只直接检查 CPL 和目标代码段的 DPL,和上面的步骤2是一样的,要求 CPL 权限小于目标代码段 DPL,即数值上 CPL &gt;目标代码段 DPL,否则处理器引发异常。</li>
+</ol>
+</li>
+<li><p>执行中断处理程序。</p>
+</li>
+</ol>
+<p><img src="/../image/%E4%B8%AD%E6%96%AD%E5%A4%84%E7%90%86%E8%BF%87%E7%A8%8B.png" alt="中断处理过程"></p>
+<p>由于IDT中会有中断门，陷阱门，任务门。中断发生时候会将NT位和TF位置为0。</p>
+<p>NT位和TF位：<br>当 NT 标志被设置为 1 时，表示允许任务嵌套。设置为0表示进入了中断处理程序。这里还有个作用，<code>iret</code>指令既可以从新任务返回到旧任务，也可以从中断返回，这里 NT 标志就是区分到底是哪种返回。<br>当 TF 标志被设置为 1 时，会启用单步调试模式。设置为0也很容易想到，中断程序怎么会让你单步调试捏。</p>
+<p>如果执行的是中断门时，会将IF位设置为0,避免中断嵌套，如果是陷阱门或者任务门则不会设置IF位为0，允许CPU响应更高级别的中断。当然也可以在中断处理程序中将IF位置为1,这样就可以处理优先级更高的中断。eflags寄存器有些位可以通过和栈配合来更改位，但是这有内存操作，效率低下且不是原子操作，所以专门给IF位提供了控制指令：<code>sti</code>开中断和<code>cli</code>关中断。IF 位(中断允许位)只能限制外部设备的中断,对那些影响系统正常运行的中断都无效,如异常 exception,软中断,如 int n 等,不可屏蔽中断 NMI 都不受 IF 限制。</p>
+<h3 id="中断发生时候的压栈"><a href="#中断发生时候的压栈" class="headerlink" title="中断发生时候的压栈"></a>中断发生时候的压栈</h3><p>布拉布拉….</p>
+<h2 id="可编程中断控制器-8259A"><a href="#可编程中断控制器-8259A" class="headerlink" title="可编程中断控制器 8259A"></a>可编程中断控制器 8259A</h2><p>最理想的方式是每个外设准备一个引脚接收中断，但是这明显不现实，成本高收益低。这时候一个中间层代理就显得智慧，这里使用的是Intel 8259A芯片。传统的PIC(就是可编程中断控制器 Programmable Interrupt Controller 的简称)是两片8259A风格的芯片级联的方式连接在一起。每个芯片可以处理8个不同的IRQ（中断请求）输入线，因为从PIC的INT输出线到主PIC的IRQ2引脚，因此可用的IRQ引脚只有<code>16 - 1</code>个。这种情况仅仅在系统只有一个CPU的情况下，将主芯片的输出引脚连接CPU的INTR引脚，但是系统有多个CPU就不适用了，引入了ACPI的新组件来代替老式的8259A芯片，这里只学习8259A芯片的原理和操作方式，不涉及多处理器的情况。<br>8259A可以管理和控制<strong>可屏蔽中断</strong>，它可以屏蔽外设中断，判断中断优先级，向CPU提供中断向量号，这些功能都是可编程的。 外接设备通过主板线路和8259A芯片连接在一起。下面是个人计算机中芯片级联方式：<br><img src="/../image/%E4%B8%AA%E4%BA%BA%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BA%A7%E8%81%94.png" alt="级联"></p>
+<h3 id="内部结构"><a href="#内部结构" class="headerlink" title="内部结构"></a>内部结构</h3><ul>
+<li>INT: 芯片挑选出来优先级最高的中断请求，发信号给CPU。</li>
+<li>INTA: INT Acknowledge,中断响应信号。用于接收CPU的INTA接口的中断响应信号。</li>
+<li>IMR(Interrupt Mask Register): 中断屏蔽寄存器，8位，用来屏蔽某个外设的中断信号。</li>
+<li>IRR(Interrupt Request Register): 中断请求寄存器，8位，用来存储等待处理的中断。</li>
+<li>PR(Priority Resolver): 优先仲裁器，找出优先级最高的中断。</li>
+<li>ISR(In-Service Register): 中断服务寄存器，8位，存储正在处理的中断。</li>
+</ul>
+<p><img src="/../image/8259A%E5%86%85%E9%83%A8%E7%BB%93%E6%9E%84.png" alt="级联"></p>
+<h3 id="工作流程"><a href="#工作流程" class="headerlink" title="工作流程"></a>工作流程</h3><ol>
+<li>外设发出一个中断信号，通过主板线路将信号传递给芯片的某个IRQ接口。</li>
+<li>8259A首先检查IMR寄存器是否屏蔽了该IRQ接口的中断信号，如果为1则表示屏蔽，直接忽略。否则将其送入IRR寄存器，将其对应位置为1。</li>
+<li>PR寄存器找出优先级最高的中断（这里优先级判断很简单，IRQ接口接口号越低，优先级越大）。</li>
+<li>芯片在控制电路中通过INT接口向CPU发送INTR信号，信号传入CPU的INTR接口后，CPU就知道有新的中断到来，执行完手里的指令就向自己的INTA接口向8259A回复一个中断响应信号，表示CPU准备就绪。</li>
+<li>8259A受到信号后，将刚才选出来的优先级最高的中断在ISR中置为1,同时将IRR中置为0。</li>
+<li>CPU再次发送INTA信号，为了获取中断对应的中断向量号。</li>
+<li>如果8259A的EOI（End of Interrupt）被设置为手动模式，中断处理程序必须有向8259A发送EOI的代码，芯片受到EOI后会自动将ISR对应中断位置为0。</li>
+</ol>
+<p>需要注意的是：并不是进入了 ISR 后的中断就高枕无忧了,它还是有可能被后者换下来的。比如,在 8259A 发送中断向量号给 CPU 之前,这时候又来了新的中断,如果它的来源 IRQ 接口号比 ISR 中的低,也就是优先级更高,原来 ISR 中准备上 CPU 处理的旧中断,其对应的 BIT 就得清 0,同时将它所在的 IRR中的相应 BIT 恢复为 1,随后在 ISR 中将此优先级更高的新中断对应的 BIT 置 1,然后将此新中断的中断向量号发给 CPU。</p>
+<h3 id="实际操作"><a href="#实际操作" class="headerlink" title="实际操作"></a>实际操作</h3><p>说了那么多，我们最终目的很简单：</p>
+<ol>
+<li>构建IDT</li>
+<li>提供中断向量号</li>
+</ol>
+<p>8259A内部有两组寄存器：初始化命令寄存器组(ICW1 ~ ICW4)，操作命令寄存器组(OCW1 ~ OCW3)。因此我们的操作也分为初始化和操作两部分。</p>
+<h4 id="初始化"><a href="#初始化" class="headerlink" title="初始化"></a>初始化</h4><p>注意：ICW1 ~ ICW4的初始是有严格顺序的。必须依次写入 ICW1、ICW2、ICW3、ICW4。因为其中某些设置是由关联，依赖的。</p>
+<h5 id="ICW1"><a href="#ICW1" class="headerlink" title="ICW1"></a>ICW1</h5><p>用来初始化 8259A 的连接方式和中断信号的触发方式。连接方式是指用单片工作,还是用多片级联工作,触发方式是指中断请求信号是电平触发,还是边沿触发。</p>
+<p><img src="/../image/ICW1.png" alt="ICW1"></p>
+<p>IC4：表示是否写入ICW4,该位为1表示需要在后面写入ICW4,为0则不需要。x86必须设置为1。<br>SNGL：该位为1,表示是单片，为0则表示级联。<br>ADI：用来设置8259A的调用时间间隔，x86不需要设置。<br>LTIM：表示中断检测方式，为0表示边沿触发，为1表示电平触发。<br>第四位恒定为1。<br>第5~7位专用于8085处理器，x86不需要，设置为0。</p>
+<h5 id="ICW2"><a href="#ICW2" class="headerlink" title="ICW2"></a>ICW2</h5><p>用来设置起始中断向量号。需要写入主片的0x21端口和从片的0xA1端口。<br>我们只需要写高五位的T3~T7，所以任意数字都是8的倍数，这个数字便是设定的起始中断向量号。第三位可以表示8个中断向量号，这是根据8259A芯片自行导入，这样就能表示任意一个IQR接口实际分配的中断向量号。</p>
+<p><img src="/../image/ICW2.png" alt="ICW2"></p>
+<h5 id="ICW3"><a href="#ICW3" class="headerlink" title="ICW3"></a>ICW3</h5><p>在级联的前提下才能使用，用来设置主从片用哪个IRQ接口互联。需要写入主片的0x21端口和从片的0xA1端口。<br>对于主片，哪个IRQ接口用于连接从片，就将其设置为1（可以设置多个从片），设置为0表示是外接设备。<br>对于从片，只需要在从片上指定主片用于连接自己的IRQ接口。这样中断发生后，主片会发送与从片做级联的 IRQ 接口号,所有从片用自己的 ICW3 的低 3 位和它对比,若一致则认为是发给自己的。高五位没用到，设置为0。</p>
+<p><img src="/../image/%E4%B8%BB%E7%89%87ICW3.png" alt="ICW3主片"><br><img src="/../image/%E4%BB%8E%E7%89%87ICW3.png" alt="ICW3从片"></p>
+<h5 id="ICW4"><a href="#ICW4" class="headerlink" title="ICW4"></a>ICW4</h5><p><img src="/../image/ICW4.png" alt="ICW4"></p>
+<p>SFNM 表示特殊全嵌套模式(Special Fully Nested Mode) ,若 SFNM 为 0,则表示全嵌套模式,若 SFNM为 1,则表示特殊全嵌套模式。<br>BUF 表示本 8259A 芯片是否工作在缓冲模式。BUF 为 0,则工作非缓冲模式,BUF 为 1,则工作在缓冲模式。<br>当多个 8259A 级联时,如果工作在缓冲模式下,M&#x2F;S 用来规定本 8259A 是主片,还是从片。若 M&#x2F;S 为 1 ,则表示则表示是主片,若 M&#x2F;S 为 0,则表示是从片。若工作在非缓冲模式(BUF 为 0)下,M&#x2F;S 无效。<br>AEOI 表示自动结束中断(Auto End Of Interrupt) ,8259A 在收到中断结束信号时才能继续处理下一个中断,此项用来设置是否要让 8259A 自动把中断结束。若 AEOI 为 0,则表示非自动,即手动结束中断,咱们可以在中断处理程序中或主函数中手动向 8259A 的主、从片发送 EOI 信号。这种“操作”类命令,通过下面要介绍的 OCW 进行。若 AEOI 为 1,则表示自动结束中断。<br>μPM 表示微处理器类型(microprocessor) ,此项是为了兼容老处理器。若 μPM 为 0,则表示 8080 或8085 处理器,若 μPM 为 1,则表示 x86 处理器。</p>
+<h4 id="OCW"><a href="#OCW" class="headerlink" title="OCW"></a>OCW</h4><h5 id="OCW1"><a href="#OCW1" class="headerlink" title="OCW1"></a>OCW1</h5><p><img src="/../image/OCW1.png" alt="OCW1"></p>
+<p>需要写入主片的0x21端口和从片的0xA1端口。<br>OCW1 用来屏蔽连接在 8259A 上的外部设备的中断信号，还记得上面说的IMR(Interrupt Mask Register)吗？实际上就是将OCW1的数据填入该寄存器中。为1表示该位被屏蔽。</p>
+<h5 id="OCW2"><a href="#OCW2" class="headerlink" title="OCW2"></a>OCW2</h5><p><img src="/../image/OCW2.png" alt="OCW2"></p>
+<p>OCW2 要写入到主片的 0x20 及从片的 0xA0 端口。<br>OCW2 用来设置中断结束方式和优先级模式。</p>
+<p>SL：Specific Level,表示是否指定优先等级。等级是用低 3 位来指定的。此处的 SL 只是开启低 3 位的开关,所以 SL 也表示低 3 位的 L2~L0 是否有效。SL 为 1 表示有效,SL 为 0 表示无效。</p>
+<p>OCW2 其中的一个作用就是发 EOI 信号结束中断。如果使 SL 为 1,可以用 OCW2 的低 3 位(L2<del>L0)来指定位于 ISR 寄存器中的哪一个中断被终止,也就是结束来自哪个 IRQ 接口的中断信号。如果 SL 位为 0,L2</del>L0 便不起作用了,8259A 会自动将正在处理的中断结束,也就是把 ISR 寄存器中优先级最高的位清 0。</p>
+<p>R：用来设置优先级控制方式。为0，则IRQ接口号越低，优先级越高。<br>R为1:设置为循环优先级方式。</p>
+<ol>
+<li>SL为0，初始优先级次序为IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5&gt;IR6&gt;IR7。</li>
+<li>SL为1,通过 L2<del>L1 指定最低优先级是哪个 IRQ 接口。<br>举个例子,在 R 和 SL 都等于 1 的情况下,若想指定 IR5 为最低的优先级,需要将 L2</del>L0 置为 101。<br>这样,新的初始优先级循环是:IR6&gt;IR7&gt;IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5。什么是循环优先级方式？当前 IR6 为最高级别中断请求,处理完成后,IR6 将变成最低级别,IR7 变成最高级别,这一组循环之后的优先级变成了:IR7&gt;IR0&gt;IR1&gt;IR2&gt;IR3&gt;IR4&gt;IR5&gt;IR6。</li>
+</ol>
+<p>EOI：End Of Interrupt,为中断结束命令位。令 EOI 为 1,则会令 ISR 寄存器中的相应位清 0,也就是<br>将当前处理的中断清掉,表示处理结束。向 8259A 主动发送 EOI 是手工结束中断的做法,所以,使用此<br>命令有个前提,就是 ICW4 中的 AEOI 位为 0,非自动结束中断时才用。</p>
+<p>只有EOI位为1时候，表示发送中断结束。</p>
+<p>OCW3用于设定特殊的屏蔽方式以及查询方式。</p>
+<h4 id="编写中断处理程序"><a href="#编写中断处理程序" class="headerlink" title="编写中断处理程序"></a>编写中断处理程序</h4><p>中断向量 0<del>19 为处理器内部固定的异常类型,20</del>31 是 Intel 保留的，所以咱们可用的中断向量号最低是 32,将来咱们在设置 8259A 的时候,会把 IR0 的中断向量号设置为 32。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/02/04/DPL-CPL-RPL/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -198,7 +893,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 23:10:41" itemprop="dateModified" datetime="2024-02-06T23:10:41+08:00">2024-02-06</time>
+                <time title="修改时间：2024-02-06 23:54:52" itemprop="dateModified" datetime="2024-02-06T23:54:52+08:00">2024-02-06</time>
               </span>
 
           
@@ -274,7 +969,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
+                <time title="修改时间：2024-02-22 12:10:25" itemprop="dateModified" datetime="2024-02-22T12:10:25+08:00">2024-02-22</time>
               </span>
 
           
@@ -347,7 +1042,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
+                <time title="修改时间：2024-02-07 22:01:02" itemprop="dateModified" datetime="2024-02-07T22:01:02+08:00">2024-02-07</time>
               </span>
 
           
@@ -362,624 +1057,9 @@
 
       
           <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a target="_blank" rel="noopener" href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
-<h2 id="每连接单一计时器"><a href="#每连接单一计时器" class="headerlink" title="每连接单一计时器"></a>每连接单一计时器</h2><p>我们都能想到，如果给每一个<code>TCP</code>分段都分配一个计时器，这是最直接的方法。但是这带来了巨大的内存开销和调度开销。难不成一个<code>TCP</code>通信的服务器负担全用来给分段计时间，这太离谱了，有没有更好的办法，先人已经为我们想到了一个适用至今的方法：采取每个TCP连接单一计时器的设计。</p>
-<p>首先我们要明确，这个超时计时器需要实现什么功能：</p>
-<ol>
-<li>有报文<strong>长时间</strong>没有接收到，必须提示超时。</li>
-<li>这个<strong>长时间</strong>不能太长也不能太短。</li>
-</ol>
-<p>如果这里的超时时间太短了，会导致正常传输的数据包被当成无效数据，网络中充斥大量无效重传，浪费网络资源；如果超时时间太长，就会导致数据传输效率的太低，网络延迟提高。</p>
-<p>因此RFC2988制定了下面的原则：</p>
-<ol>
-<li>每次发送包含数据的数据包（包括重传）时，如果定时器没有运行，则启动定时器。如果定时器在运行，就什么也不做。</li>
-<li>当所有未完成的数据都被确认后，关闭定时器。</li>
-<li>当接收到新数据的ACK时候，重新启动定时器。<br>当定时器超时时，执行下面的操作：</li>
-<li>指数退避，发送方设置 RTO 为之前的二倍，并且关闭定时器。</li>
-<li>重传 TCP 接收方尚未确认的最早的报文段。</li>
-<li>启动重传定时器。</li>
-</ol>
-<p>为什么要有原则 3 ？</p>
-<p>假设下面的情况，如果在定时器快到期的时候发送一部分数据。这样在超时前，只能收到定时器刚开始运行时发送的报文段，后续的正常数据包会被当作超时，因此后续的数据都需要重传，这太考验网络的负载和使用者的耐心了。有了原则3，好处自然不用我多说，保证一部分正常数据的不必要重传。</p>
-<p>还有就是如果一个ack到来了，说明后续的ack大概率也会到达，即使出现了丢失，也会在两倍的 RTO 内被重传。为什么是两倍呢？举个简单的例子，A和B是两个同时发送的报文段的ACK（假设，一般会将其合并成一个ACK进行发送），发送方在无限接近超时时候收到了A,此时会将定时器重新启动，如果B数据包在网络中丢失，那么发送方再等待一个 RTO 就会知道 B 丢失。这样算下来不就是两倍的 RTO 内会被重传嘛。</p>
-<h2 id="RTO的计算"><a href="#RTO的计算" class="headerlink" title="RTO的计算"></a>RTO的计算</h2><p>为了计算RTO,TCP的发送方需要维护两个变量：SRTT(平滑往返时间，英文：Smoothed Round-Trip Time)和RTTAR（往返时间变化，英文：Returns the Round Trip Time Variance）。</p>
-<p>SRTT、RTTAVR和RTO的计算规则如下：</p>
-<ol>
-<li>测量RTT之前，需要将RTO设置为3秒，此时指数退避依旧有效。<br> 该计时器实际上会产生2.5秒到3秒的数值。因为使用粒度为G的心跳计时器的实现不应该将计时器设置低于<code>2.5 + G</code>秒。</li>
-<li>当进行第一个 RTT 测量时候，主机必须如下设置:<ul>
-<li>SRTT &lt;- R</li>
-<li>RTTVAR &lt;- R&#x2F;2</li>
-<li>RTO &lt;- SRTT + max(G,K * RTTVAR) 这里的K为4</li>
-</ul>
-</li>
-<li>当进行了一个后续的往返时间测量 R’ 时，主机必须设置：<ul>
-<li>RTTVAR &lt;- (1 - beta) * RTTVAR + beta * | SRTT - R’|</li>
-<li>SRTT &lt;- (1 - alpha) * SRTT + alpha * R’<br>这里的alpha为1&#x2F;8，beta &#x3D; 1&#x2F;4。（2988里面说是 JK88 建议的，应该是个1988年的论文吧，没找到）。<br>这里需要注意的是，计算RTTVAR时用到的SRTT，必须是分配前的数值，也就是说，这两个计算的顺序不能改变。<br>计算 RTO 时候，如果其小于 1 秒，上取整。RTO可以设置最大值，但是最大值应该大于60秒。</li>
-</ul>
-</li>
-</ol>
-<h2 id="获取-RTT-的样本"><a href="#获取-RTT-的样本" class="headerlink" title="获取 RTT 的样本"></a>获取 RTT 的样本</h2><p>TCP<strong>必须</strong>使用<a target="_blank" rel="noopener" href="https://www.geeksforgeeks.org/karns-algorithm-for-optimizing-tcp/">Karn-Partridge 算法</a>来获取准确的消息往返时间估计。由于重传的模糊性，举个简单的例子，如果一个报文段发送了一次重传，发送方接受到ACK，但是此时的ACK到底是重传报文段的确认还是第一次发送的报文段的确认，这就是重传的模糊性，发送方不知道到底是哪个报文段的确认，这样得到的RTT会有很大的偏差，当然这个问题可以由TCP的时间戳选项来解决。该算法会忽略重传的数据段。仅使用明确的确认（即仅传送一次的段的确认）来估计往返时间。Karn 算法的第一部分规定，当存在重传模糊性时，RTT 值将被忽略，而不是集成到 SRTT 中。</p>
-<p>但是也有问题，这么简单粗暴的方法，举个例子，如果TCP延迟显著增加后发送数据，TCP计算超时，并且根据之前的RTT来重新传输数据，极端情况下，TCP忽略所有的重传数据包的RTT,RTO永远不会更新。</p>
-<p>其第二部分就是考虑到了这种不太理想的网络情况。为每次重传的RTO设置“退避因子”，也就是常说的指数退避。在不需要重传的成功数据传输发生之前，不会重置退避因子。该部分会放置网络的拥塞，使其能从任何拥塞问题中恢复，还保证了RTT信息不会丢失，当数据成功传输而无需重传时，可以将伴随的RTT测量添加到SRTT中。</p>
-<p>目前很多TCP实现了时间戳，这样就方便多了，发送端再也不需要保存发送分段的时间了，只需要将其放入协议头的时间戳字段，然后接收端将其回显在ACK即可，然后发送端收到ACK后，取出时间戳，和当前时间做算术差，即可完成一次RTT的测量。</p>
-<p>需要注意的是：TCP 实现可以在多次回退计时器后清除 SRTT 和 RTTVAR，因为在这种情况下当前 SRTT 和 RTTVAR 很可能是假的。一旦 SRTT 和 RTTVAR 被清除，它们应该采集的下一个 RTT 样本进行初始化（RTO的第二步）。</p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/12/20/epoll%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/12/20/epoll%E5%A6%82%E4%BD%95%E5%AE%9E%E7%8E%B0IO%E5%A4%9A%E8%B7%AF%E5%A4%8D%E7%94%A8/" class="post-title-link" itemprop="url">epoll如何实现IO多路复用</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-12-20 19:21:24" itemprop="dateCreated datePublished" datetime="2023-12-20T19:21:24+08:00">2023-12-20</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>大一暑假完成了一个C++在线聊天室，对epoll的应用仅仅在于那三个函数：</p>
-<ul>
-<li>epoll_create</li>
-<li>epoll_ctl</li>
-<li>epoll_wait</li>
-</ul>
-<p>看看epoll的源码实现，理解epoll是如何实现IO多路复用的。这里我看的是linux2.6.39.4版本的源码，在<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source">在线网站</a>可以查看。如果有错误敬请斧正。</p>
-<h2 id="accept-系统调用创建新的-socket-对象"><a href="#accept-系统调用创建新的-socket-对象" class="headerlink" title="accept 系统调用创建新的 socket 对象"></a>accept 系统调用创建新的 socket 对象</h2><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// net/socket.c:1478</span></span><br><span class="line">SYSCALL_DEFINE4(accept4, <span class="type">int</span>, fd, <span class="keyword">struct</span> sockaddr __user *, upeer_sockaddr,</span><br><span class="line">		<span class="type">int</span> __user *, upeer_addrlen, <span class="type">int</span>, flags)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">socket</span> *<span class="title">sock</span>, *<span class="title">newsock</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">newfile</span>;</span></span><br><span class="line">	<span class="type">int</span> err, len, newfd, fput_needed;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sockaddr_storage</span> <span class="title">address</span>;</span></span><br><span class="line">    <span class="comment">// 0. 关于 flags 的处理</span></span><br><span class="line">	<span class="keyword">if</span> (flags &amp; ~(SOCK_CLOEXEC | SOCK_NONBLOCK))</span><br><span class="line">		<span class="keyword">return</span> -EINVAL;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (SOCK_NONBLOCK != O_NONBLOCK &amp;&amp; (flags &amp; SOCK_NONBLOCK))</span><br><span class="line">		flags = (flags &amp; ~SOCK_NONBLOCK) | O_NONBLOCK;</span><br><span class="line">    <span class="comment">// 1. 根据 fd 查找到监听的 socket</span></span><br><span class="line">	sock = sockfd_lookup_light(fd, &amp;err, &amp;fput_needed);</span><br><span class="line">	<span class="keyword">if</span> (!sock)</span><br><span class="line">		<span class="keyword">goto</span> out;</span><br><span class="line"></span><br><span class="line">	err = -ENFILE;</span><br><span class="line">    <span class="comment">// 2. alloc 一个新的 socket 对象</span></span><br><span class="line">	newsock = sock_alloc();</span><br><span class="line">	<span class="keyword">if</span> (!newsock)</span><br><span class="line">		<span class="keyword">goto</span> out_put;</span><br><span class="line">    <span class="comment">// 初始化新的socket部分信息</span></span><br><span class="line">	newsock-&gt;type = sock-&gt;type;</span><br><span class="line">	newsock-&gt;ops = sock-&gt;ops;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/*</span></span><br><span class="line"><span class="comment">	 * We don&#x27;t need try_module_get here, as the listening socket (sock)</span></span><br><span class="line"><span class="comment">	 * has the protocol module (sock-&gt;ops-&gt;owner) held.</span></span><br><span class="line"><span class="comment">	 */</span></span><br><span class="line">     <span class="comment">// 在套接字创建的过程中，为了确保模块在使用期间不会被卸载，需要增加模块的引用计数。</span></span><br><span class="line">	__module_get(newsock-&gt;ops-&gt;owner);</span><br><span class="line">    <span class="comment">// 3. 为新的 socket 分配一个新的 file 对象</span></span><br><span class="line">	newfd = sock_alloc_file(newsock, &amp;newfile, flags);</span><br><span class="line">	<span class="keyword">if</span> (unlikely(newfd &lt; <span class="number">0</span>)) &#123;</span><br><span class="line">		err = newfd;</span><br><span class="line">		sock_release(newsock);</span><br><span class="line">    </span><br><span class="line">	err = security_socket_accept(sock, newsock);</span><br><span class="line">	<span class="keyword">if</span> (err)</span><br><span class="line">		<span class="keyword">goto</span> out_fd;</span><br><span class="line">    <span class="comment">// 4. 接收连接</span></span><br><span class="line">	err = sock-&gt;ops-&gt;accept(sock, newsock, sock-&gt;file-&gt;f_flags);</span><br><span class="line">	<span class="keyword">if</span> (err &lt; <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">goto</span> out_fd;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (upeer_sockaddr) &#123;</span><br><span class="line">		<span class="keyword">if</span> (newsock-&gt;ops-&gt;getname(newsock, (<span class="keyword">struct</span> sockaddr *)&amp;address,</span><br><span class="line">					  &amp;len, <span class="number">2</span>) &lt; <span class="number">0</span>) &#123;</span><br><span class="line">			err = -ECONNABORTED;</span><br><span class="line">			<span class="keyword">goto</span> out_fd;</span><br><span class="line">		&#125;</span><br><span class="line">		err = move_addr_to_user((<span class="keyword">struct</span> sockaddr *)&amp;address,</span><br><span class="line">					len, upeer_sockaddr, upeer_addrlen);</span><br><span class="line">		<span class="keyword">if</span> (err &lt; <span class="number">0</span>)</span><br><span class="line">			<span class="keyword">goto</span> out_fd;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="comment">/* File flags are not inherited via accept() unlike another OSes. */</span></span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 5. 将新的文件添加到当前进程的打开文件列表</span></span><br><span class="line">	fd_install(newfd, newfile);</span><br><span class="line">	err = newfd;</span><br><span class="line"></span><br><span class="line">out_put:</span><br><span class="line">	fput_light(sock-&gt;file, fput_needed);</span><br><span class="line">out:</span><br><span class="line">	<span class="keyword">return</span> err;</span><br><span class="line">out_fd:</span><br><span class="line">	fput(newfile);</span><br><span class="line">	put_unused_fd(newfd);</span><br><span class="line">	<span class="keyword">goto</span> out_put;</span><br><span class="line">&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">SYSCALL_DEFINE3(accept, <span class="type">int</span>, fd, <span class="keyword">struct</span> sockaddr __user *, upeer_sockaddr,</span><br><span class="line">		<span class="type">int</span> __user *, upeer_addrlen)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">return</span> sys_accept4(fd, upeer_sockaddr, upeer_addrlen, <span class="number">0</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="0-关于-flags-的处理"><a href="#0-关于-flags-的处理" class="headerlink" title="0. 关于 flags 的处理"></a>0. 关于 flags 的处理</h3><p>可以看到这里<code>accept</code>和<code>accept4</code>的区别仅仅是多了一个<code>flags</code>的参数，如果想了解这些<code>flags</code>的设置可以自行搜索。如果使用<code>accept</code>，本质上运行的是<code>flags</code>参数为0的<code>accept4</code>。</p>
-<h3 id="1-根据-fd-查找到监听的-socket"><a href="#1-根据-fd-查找到监听的-socket" class="headerlink" title="1. 根据 fd 查找到监听的 socket"></a>1. 根据 fd 查找到监听的 socket</h3><figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// include/asm-generic/error-base.h</span></span><br><span class="line"><span class="comment">// 可以看到这个宏对应没有找到套接字对象</span></span><br><span class="line"><span class="meta">#<span class="keyword">define</span>	EBADF		 9	<span class="comment">/* Bad file number */</span></span></span><br><span class="line"></span><br><span class="line"><span class="comment">// net/socket.c:450</span></span><br><span class="line"><span class="type">static</span> <span class="keyword">struct</span> socket *<span class="title function_">sockfd_lookup_light</span><span class="params">(<span class="type">int</span> fd, <span class="type">int</span> *err, <span class="type">int</span> *fput_needed)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">file</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">socket</span> *<span class="title">sock</span>;</span></span><br><span class="line"></span><br><span class="line">	*err = -EBADF;</span><br><span class="line">	file = fget_light(fd, fput_needed);</span><br><span class="line">	<span class="keyword">if</span> (file) &#123;</span><br><span class="line">		sock = sock_from_file(file, err);</span><br><span class="line">		<span class="keyword">if</span> (sock)</span><br><span class="line">			<span class="keyword">return</span> sock;</span><br><span class="line">		fput_light(file, *fput_needed);</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">return</span> <span class="literal">NULL</span>;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里还有另一个参数<code>fput_needed</code>，该参数是在<code>fget_light</code>内被初始化的，感兴趣的读者可以去看看,路径是<code>/fs/file_table.c</code>第331行，简单说一下其作用：</p>
-<ul>
-<li>如果 fput_needed 的值为 1，表示文件引用计数已经成功增加，调用者在使用完文件后需要调用<code>fput</code>函数来减少引用计数。</li>
-<li>如果 fput_needed 的值为 0，表示文件引用计数未增加，可能由于并发操作中文件已被释放，调用者无需调用<code>fput</code>。</li>
-</ul>
-<p>套接字分为两类：监听套接字和连接套接字。监听套接字是使用<code>socket()</code>创建一个套接字，<code>bind()</code>将其绑定到一个特定的本地地址和端口，<code>listen()</code>开始监听连接请求。连接套接字是使用<code>accept()</code>来创建与特定客户进行通信。而创建连接套接字的时候会使用监听套接字的部分设置（比如地址簇A、套接字类型、协议类型等等），当然连接套接字也有自己的一些设置，比如新的本地端口号等等。这里<code>sockfd_lookup_light</code>函数的作用是通过<code>fd</code>来找到监听套接字的<code>socket</code>结构体指针。准备后面的部分设置共享。</p>
-<h3 id="2-alloc-一个新的-socket-对象"><a href="#2-alloc-一个新的-socket-对象" class="headerlink" title="2. alloc 一个新的 socket 对象"></a>2. alloc 一个新的 socket 对象</h3><p>这里首先调用<code>sock_alloc</code>函数申请一个新的<code>socket</code>对象。然后将监听套接字的<code>socket</code>对象的<code>type</code>和协议操作函数集合<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/net.h#L160">ops</a>赋给新<code>socket</code>对象。这里的<code>ops</code>里面主要是协议族，内核模块，以及一些需要的函数，感兴趣的可以去看看。需要注意的是这里的<code>ops</code>是一个指针，并不是将其整体复制了一份。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">socket</span> &#123;</span></span><br><span class="line">	socket_state		state;</span><br><span class="line">	kmemcheck_bitfield_begin(type);</span><br><span class="line">	<span class="type">short</span>			type;</span><br><span class="line">	kmemcheck_bitfield_end(type);</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span>		flags;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">socket_wq</span> __<span class="title">rcu</span>	*<span class="title">wq</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span>		*<span class="title">file</span>;</span>  <span class="comment">// file descriptor</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">sock</span>		*<span class="title">sk</span>;</span>    <span class="comment">// 核心成员</span></span><br><span class="line">	<span class="type">const</span> <span class="class"><span class="keyword">struct</span> <span class="title">proto_ops</span>	*<span class="title">ops</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-
-<h3 id="3-为新的-socket-分配一个新的-file-对象"><a href="#3-为新的-socket-分配一个新的-file-对象" class="headerlink" title="3. 为新的 socket 分配一个新的 file 对象"></a>3. 为新的 socket 分配一个新的 file 对象</h3><p>这里的<code>file</code>对象其实就表示打开的文件对象，也就是文件描述符。使得连接套接字能通过文件描述符进行访问和操作。对其感兴趣可以点击该<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/fs.h#L933">链接</a>查看file结构体的具体细节。</p>
-<p>因为连接套接字的<code>socket</code>对象的<code>file</code>指针还是空的。接下来调用<code>sock_alloc_file</code>函数来申请并且初始化该对象。并且将其设置在<code>sock-&gt;file</code>对象。具体代码点<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/socket.c#L389">链接</a>。</p>
-<p>新的socket对象-&gt;file-&gt;f_op-&gt;poll<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/fs.h#L1545">函数</a>指向的是sock_poll，之后会用到的。</p>
-<h3 id="4-接收连接"><a href="#4-接收连接" class="headerlink" title="4. 接收连接"></a>4. 接收连接</h3><p>这里介绍另一个<code>socket</code>对象中的核心成员<code>sock</code>。该<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/net/sock.h#L238">结构体</a>非常大，其中发送队列、接收数据包的队列、错误队列、缓存锁、异步等待的队列、数据包的哈希值，数量等核心数据结构都在这里。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">   <span class="comment">// 安全性检查</span></span><br><span class="line">err = security_socket_accept(sock, newsock);</span><br><span class="line"><span class="keyword">if</span> (err)</span><br><span class="line">	<span class="keyword">goto</span> out_fd;</span><br><span class="line"></span><br><span class="line">err = sock-&gt;ops-&gt;accept(sock, newsock, sock-&gt;file-&gt;f_flags);</span><br><span class="line"><span class="keyword">if</span> (err &lt; <span class="number">0</span>)</span><br><span class="line">	<span class="keyword">goto</span> out_fd;</span><br></pre></td></tr></table></figure>
-<p>这里的<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/tipc/socket.c#L1491">accept</a>对应的是<code>inet-accept</code>。它会从握手队列中直接获取创建好的<code>sock</code>。</p>
-<h3 id="5-将新的文件添加到当前进程的打开文件列表"><a href="#5-将新的文件添加到当前进程的打开文件列表" class="headerlink" title="5. 将新的文件添加到当前进程的打开文件列表"></a>5. 将新的文件添加到当前进程的打开文件列表</h3><p>当 file、socket、sock 等关键内核对象创建完毕以后，剩下要做的一件事情就是把它挂到当前进程的打开文件列表中就行了。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// fs/file.c</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">fd_install</span><span class="params">(<span class="type">unsigned</span> <span class="type">int</span> fd, <span class="keyword">struct</span> file *file)</span></span><br><span class="line">&#123;</span><br><span class="line">    __fd_install(current-&gt;files, fd, file);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">void</span> __fd_install(<span class="keyword">struct</span> files_struct *files, <span class="type">unsigned</span> <span class="type">int</span> fd,</span><br><span class="line">        <span class="keyword">struct</span> file *file)</span><br><span class="line">&#123;</span><br><span class="line">    fdt = files_fdtable(files);</span><br><span class="line">    BUG_ON(fdt-&gt;fd[fd] != <span class="literal">NULL</span>);</span><br><span class="line">    rcu_assign_pointer(fdt-&gt;fd[fd], file);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<!-- [socket()](https://elixir.bootlin.com/linux/v2.6.39.4/source/net/socket.c#L1294)
-[socket_create](https://elixir.bootlin.com/linux/v2.6.39.4/source/net/socket.c#L1270) -->
-
-<h2 id="epoll-create-的实现"><a href="#epoll-create-的实现" class="headerlink" title="epoll_create 的实现"></a>epoll_create 的实现</h2><p>用户进程在调用<code>epoll_create</code>时，内核会创建一个<code>eventpoll</code>对象。将其关联到当前进程的已打开文件列表中。<code>epoll_create</code><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L1306">源码</a>：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// fs/eventpool.c</span></span><br><span class="line">SYSCALL_DEFINE1(epoll_create1, <span class="type">int</span>, flags)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> *<span class="title">ep</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line">	<span class="comment">// flags处理</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// 1. ep_alloc</span></span><br><span class="line">	error = ep_alloc(&amp;ep);</span><br><span class="line">	<span class="comment">// 错误处理</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line"></span><br><span class="line">	<span class="comment">// 2. 创建匿名的文件对象以及文件描述符</span></span><br><span class="line">	error = anon_inode_getfd(<span class="string">&quot;[eventpoll]&quot;</span>, &amp;eventpoll_fops, ep,</span><br><span class="line">				 O_RDWR | (flags &amp; O_CLOEXEC));</span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<h3 id="1-ep-alloc"><a href="#1-ep-alloc" class="headerlink" title="1. ep_alloc"></a>1. ep_alloc</h3><p><code>eventpoll</code>的<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L158">实现</a>，这里我们只看主要的成员：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// fs/eventpool.c</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> &#123;</span></span><br><span class="line">    <span class="comment">// 等待队列，链表</span></span><br><span class="line">	<span class="type">wait_queue_head_t</span> wq;</span><br><span class="line">	<span class="comment">// 接收就绪的描述符，链表</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">rdllist</span>;</span></span><br><span class="line">	<span class="comment">// 红黑树</span></span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">rb_root</span> <span class="title">rbr</span>;</span></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-<p>成员作用：</p>
-<ul>
-<li><strong>wq</strong>：软中断数据就绪的时候会通过wq来找到阻塞在epoll对象上的用户<strong>进程</strong>。等待队列链表用于管理等待事件发生的进程。</li>
-<li><strong>rbr</strong>：红黑树用于存储被监控的文件描述符（fd）的数据结构及其状态信息。</li>
-<li><strong>rdllist</strong>：当有连接就绪时，会将就绪的连接放在该链表中。这样就不用遍历整棵树。<br>然后在<code>ep_alloc</code>里面实现初始化工作，<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L748">源码</a>：<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">ep_alloc</span><span class="params">(<span class="keyword">struct</span> eventpoll **pep)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">user_struct</span> *<span class="title">user</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> *<span class="title">ep</span>;</span></span><br><span class="line"></span><br><span class="line">	user = get_current_user();</span><br><span class="line">	error = -ENOMEM;</span><br><span class="line">	<span class="comment">// ep的初始化操作</span></span><br><span class="line">	ep = kzalloc(<span class="keyword">sizeof</span>(*ep), GFP_KERNEL);</span><br><span class="line">	<span class="keyword">if</span> (unlikely(!ep))</span><br><span class="line">		<span class="keyword">goto</span> free_uid;</span><br><span class="line"></span><br><span class="line">	spin_lock_init(&amp;ep-&gt;lock);</span><br><span class="line">	mutex_init(&amp;ep-&gt;mtx);</span><br><span class="line">	init_waitqueue_head(&amp;ep-&gt;wq);</span><br><span class="line">	init_waitqueue_head(&amp;ep-&gt;poll_wait);</span><br><span class="line">	INIT_LIST_HEAD(&amp;ep-&gt;rdllist);</span><br><span class="line">	ep-&gt;rbr = RB_ROOT;</span><br><span class="line">	ep-&gt;ovflist = EP_UNACTIVE_PTR;</span><br><span class="line">	ep-&gt;user = user;</span><br><span class="line"></span><br><span class="line">	*pep = ep;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">free_uid:</span><br><span class="line">	free_uid(user);</span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
-</ul>
-<h3 id="2-创建匿名的文件对象以及文件描述符"><a href="#2-创建匿名的文件对象以及文件描述符" class="headerlink" title="2. 创建匿名的文件对象以及文件描述符"></a>2. 创建匿名的文件对象以及文件描述符</h3><p>匿名文件对象是内核用于表示一些临时或者有特殊用途的文件对象，其是在内存中动态创建和管理的，常见用于进程间通信（比如<code>pipe</code>、<code>fifo</code>）、临时文件、内核模块之间的通信以及一些特殊的操作。通过将文件挂接在单个 inode 上来创建新文件。这对于不需要拥有完整 inode 即可正确运行的文件非常有用。使用 anon_inode_getfd() 创建的所有文件将共享一个 inode，从而节省内存并避免文件&#x2F;inode&#x2F;dentry 设置的代码重复。将<code>epoll</code>和文件描述符关联起来，内核也更方便管理和处理被监视的文件描述符的事件。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">int</span> <span class="title function_">anon_inode_getfd</span><span class="params">(<span class="type">const</span> <span class="type">char</span> *name, <span class="type">const</span> <span class="keyword">struct</span> file_operations *fops,</span></span><br><span class="line"><span class="params">		     <span class="type">void</span> *priv, <span class="type">int</span> flags)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error, fd;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">file</span>;</span></span><br><span class="line">	<span class="comment">// 获取一个未被使用的文件描述符</span></span><br><span class="line">	error = get_unused_fd_flags(flags);</span><br><span class="line">	<span class="keyword">if</span> (error &lt; <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">return</span> error;</span><br><span class="line">	fd = error;</span><br><span class="line">	<span class="comment">// 创建一个匿名文件对象</span></span><br><span class="line">	file = anon_inode_getfile(name, fops, priv, flags);</span><br><span class="line">	<span class="comment">// 创建文件对象发生错误的处理</span></span><br><span class="line">	<span class="keyword">if</span> (IS_ERR(file)) &#123;</span><br><span class="line">		error = PTR_ERR(file);</span><br><span class="line">		<span class="keyword">goto</span> err_put_unused_fd;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="comment">// 将该匿名文件对象和文件描述符关联起来</span></span><br><span class="line">	fd_install(fd, file);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> fd;</span><br><span class="line"></span><br><span class="line">err_put_unused_fd:</span><br><span class="line">	put_unused_fd(fd);</span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br><span class="line">EXPORT_SYMBOL_GPL(anon_inode_getfd);</span><br></pre></td></tr></table></figure>
-
-<p>总结epoll_create函数所做的事：调用epoll_create后，在内核中分配一个eventpoll结构和代表epoll文件的file结构，并且将这两个结构关联在一块，同时，返回一个也与file结构相关联的epoll文件描述符fd。当应用程序操作epoll时，需要传入一个epoll文件描述符fd，内核根据这个fd，找到epoll的file结构，然后通过file，获取之前epoll_create申请eventpoll结构变量，epoll相关的重要信息都存储在这个结构里面。接下来，所有epoll接口函数的操作，都是在eventpoll结构变量上进行的。</p>
-<p>所以，epoll_create的作用就是为进程在内核中建立一个从epoll文件描述符到eventpoll结构变量的通道。</p>
-<h2 id="epoll-ctl-的实现"><a href="#epoll-ctl-的实现" class="headerlink" title="epoll_ctl 的实现"></a>epoll_ctl 的实现</h2><p>这里是理解epoll的核心区域（这么久了，终于到了….）。<br>首先epoll_ctl的作用是添加、修改、删除文件的监听事件，<a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L1347">内核代码</a>：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br></pre></td><td class="code"><pre><span class="line">SYSCALL_DEFINE4(epoll_ctl, <span class="type">int</span>, epfd, <span class="type">int</span>, op, <span class="type">int</span>, fd,</span><br><span class="line">		<span class="keyword">struct</span> epoll_event __user *, event)</span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error;</span><br><span class="line">	<span class="type">int</span> did_lock_epmutex = <span class="number">0</span>;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">file</span> *<span class="title">file</span>, *<span class="title">tfile</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">eventpoll</span> *<span class="title">ep</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epitem</span> *<span class="title">epi</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epoll_event</span> <span class="title">epds</span>;</span></span><br><span class="line">    <span class="comment">//#define	EFAULT		14	/* Bad address */</span></span><br><span class="line">	error = -EFAULT;</span><br><span class="line">    <span class="comment">// 1. 根据操作判断是否拷贝到内核以及获取 file 对象</span></span><br><span class="line">	<span class="keyword">if</span> (ep_op_has_event(op) &amp;&amp;</span><br><span class="line">	    copy_from_user(&amp;epds, event, <span class="keyword">sizeof</span>(<span class="keyword">struct</span> epoll_event)))</span><br><span class="line">		<span class="keyword">goto</span> error_return;</span><br><span class="line">    <span class="comment">//#define	EBADF		 9	/* Bad file number */</span></span><br><span class="line">	error = -EBADF;</span><br><span class="line">	<span class="comment">// 通过文件描述符获取 file对象</span></span><br><span class="line">	file = fget(epfd);</span><br><span class="line">	<span class="keyword">if</span> (!file)</span><br><span class="line">		<span class="keyword">goto</span> error_return;</span><br><span class="line">	tfile = fget(fd);</span><br><span class="line">	<span class="keyword">if</span> (!tfile)</span><br><span class="line">		<span class="keyword">goto</span> error_fput;</span><br><span class="line">    <span class="comment">//#define	EPERM		 1	/* Operation not permitted */</span></span><br><span class="line">	error = -EPERM;</span><br><span class="line">	<span class="keyword">if</span> (!tfile-&gt;f_op || !tfile-&gt;f_op-&gt;poll)</span><br><span class="line">		<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//#define	EINVAL		22	/* Invalid argument */</span></span><br><span class="line">	error = -EINVAL;</span><br><span class="line">	<span class="keyword">if</span> (file == tfile || !is_file_epoll(file))</span><br><span class="line">		<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	ep = file-&gt;private_data;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 2. 循环引用的处理</span></span><br><span class="line">	<span class="keyword">if</span> (unlikely(is_file_epoll(tfile) &amp;&amp; op == EPOLL_CTL_ADD)) &#123;</span><br><span class="line">		mutex_lock(&amp;epmutex);</span><br><span class="line">		did_lock_epmutex = <span class="number">1</span>;</span><br><span class="line">		error = -ELOOP;</span><br><span class="line">		<span class="keyword">if</span> (ep_loop_check(ep, tfile) != <span class="number">0</span>)</span><br><span class="line">			<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	mutex_lock(&amp;ep-&gt;mtx);</span><br><span class="line">	<span class="comment">// 3. ep_find</span></span><br><span class="line">	epi = ep_find(ep, tfile, fd);</span><br><span class="line"></span><br><span class="line">	error = -EINVAL;</span><br><span class="line">	<span class="comment">// 4. </span></span><br><span class="line">	<span class="keyword">switch</span> (op) &#123;(!is_file_epoll(f.file));</span><br><span class="line">	<span class="keyword">case</span> EPOLL_CTL_ADD:</span><br><span class="line">		<span class="keyword">if</span> (!epi) &#123;</span><br><span class="line">			epds.events |= POLLERR | POLLHUP;</span><br><span class="line">			error = nsert(ep, &amp;epds, tfile, fd);</span><br><span class="line">		&#125; <span class="keyword">else</span></span><br><span class="line">			error = -EEXIST;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line">	<span class="keyword">case</span> EPOLL_CTL_DEL:</span><br><span class="line">		<span class="keyword">if</span> (epi)</span><br><span class="line">			error = ep_remove(ep, epi);</span><br><span class="line">		<span class="keyword">else</span></span><br><span class="line">			error = -ENOENT;</span><br><span class="line">		<span class="keyword">break</span>;flags</span><br><span class="line">	<span class="keyword">case</span> EPOLL_CTL_MOD:</span><br><span class="line">		<span class="keyword">if</span> (epi) &#123;</span><br><span class="line">			epds.events |= POLLERR | POLLHUP;</span><br><span class="line">			error = ep_modify(ep, epi, &amp;epds);</span><br><span class="line">		&#125; <span class="keyword">else</span></span><br><span class="line">			error = -ENOENT;</span><br><span class="line">		<span class="keyword">break</span>;</span><br><span class="line">	&#125;</span><br><span class="line">	mutex_unlock(&amp;ep-&gt;mtx);</span><br><span class="line"></span><br><span class="line">error_tgt_fput:</span><br><span class="line">	<span class="keyword">if</span> (unlikely(did_lock_epmutex))</span><br><span class="line">		mutex_unlock(&amp;epmutex);</span><br><span class="line"></span><br><span class="line">	fput(tfile);</span><br><span class="line">error_fput:</span><br><span class="line">	fput(file);</span><br><span class="line">error_return:</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="1-根据操作判断是否拷贝到内核以及获取-file-对象"><a href="#1-根据操作判断是否拷贝到内核以及获取-file-对象" class="headerlink" title="1. 根据操作判断是否拷贝到内核以及获取 file 对象"></a>1. 根据操作判断是否拷贝到内核以及获取 file 对象</h3><p>这里的<code>op</code>是对<code>epoll</code>操作动作（添加、删除、修改），<code>ep_op_has_event(op)</code>是判断是否是删除操作，如果<code>op != EPOLL_CTL_DEL 为 true</code>时，则需要调用<code>copy_from_user()</code>将<code>event</code>事件拷贝到内核的<code>epds</code>变量中。因为只有删除操作不需要内核使用进程传入的<code>event</code>事件。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="keyword">inline</span> <span class="type">int</span> <span class="title function_">ep_op_has_event</span><span class="params">(<span class="type">int</span> op)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="keyword">return</span> op != EPOLL_CTL_DEL;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>接下来调用两次<code>fget</code>分别获取epoll文件和连接套接字文件的file结构变量。</p>
-<p>接下来就是对参数的一些检查，出现如下情况，就可以认为传入的参数有问题，直接返回出错：</p>
-<ol>
-<li>目标文件不支持poll操作(!tf.file-&gt;f_op-&gt;poll)；</li>
-<li>监听的目标文件就是epoll文件本身(f.file &#x3D;&#x3D; tf.file)；</li>
-<li>用户传入的epoll文件(epfd代表的文件）并不是一个真正的epoll的文件(!is_file_epoll(f.file));</li>
-</ol>
-<h3 id="2-循环引用的处理"><a href="#2-循环引用的处理" class="headerlink" title="2. 循环引用的处理"></a>2. 循环引用的处理</h3><p>这里会有一个问题，假设有两个epoll文件描述符 A 和 B，且A已经插入到B的文件描述符中，而某个时刻B直接或者间接插入到A中，这就形成闭环，导致事件发生时递归处理，从来形成文件的事件循环，这就是循环引用。它会导致死锁或者其他的问题。这里为了解决循环引用，代码中是下面的措施：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">if</span> (unlikely(is_file_epoll(tfile) &amp;&amp; op == EPOLL_CTL_ADD)) &#123;</span><br><span class="line">	mutex_lock(&amp;epmutex);	</span><br><span class="line">	did_lock_epmutex = <span class="number">1</span>;</span><br><span class="line">	error = -ELOOP;</span><br><span class="line">	<span class="keyword">if</span> (ep_loop_check(ep, tfile) != <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">goto</span> error_tgt_fput;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>这里先判断插入的文件描述符是否是epoll文件描述符，是否是<code>EPOLL_CTL_ADD</code>操作，条件满足时会先<code>mutex_lock(&amp;epmutex);</code>获取全局锁防止处理时发生竞争，接下来判断是否存在闭环<code>ep_loop_check(ep, tfile) != 0</code>，如果存在进入对应错误处理。</p>
-<h3 id="3-ep-find"><a href="#3-ep-find" class="headerlink" title="3. ep_find"></a>3. ep_find</h3> <!-- Try to lookup the file inside our RB tree, Since we grabbed "mtx" above, we can be sure to be able to use the item looked up by ep_find() till we release the mutex. -->
-
-<p>在ep里面，维护着一个红黑树<code>rbr</code>，每次添加注册事件时，都会申请一个epitem结构的变量表示事件的监听项，然后插入ep的红黑树里面。在epoll_ctl里面，会调用ep_find函数从ep的红黑树里面查找目标文件表示的监听项，返回的监听项可能为空。而<code>epoll_filefd</code><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/fs/eventpoll.c#L93">结构体</a>中只有两个成员:file结构体和其对应的fd。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line"><span class="type">static</span> <span class="keyword">struct</span> epitem *<span class="title function_">ep_find</span><span class="params">(<span class="keyword">struct</span> eventpoll *ep, <span class="keyword">struct</span> file *file, <span class="type">int</span> fd)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> kcmp;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">rb_node</span> *<span class="title">rbp</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epitem</span> *<span class="title">epi</span>, *<span class="title">epir</span> =</span> <span class="literal">NULL</span>;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epoll_filefd</span> <span class="title">ffd</span>;</span></span><br><span class="line">	<span class="comment">//epi 用于遍历红黑树节点，epir 用于存储最终找到的 epitem 结构体</span></span><br><span class="line">	ep_set_ffd(&amp;ffd, file, fd);</span><br><span class="line">	<span class="comment">// 遍历红黑树查找其对应的 epitem</span></span><br><span class="line">	<span class="keyword">for</span> (rbp = ep-&gt;rbr.rb_node; rbp; ) &#123;</span><br><span class="line">		epi = rb_entry(rbp, <span class="keyword">struct</span> epitem, rbn);</span><br><span class="line">		kcmp = ep_cmp_ffd(&amp;ffd, &amp;epi-&gt;ffd);</span><br><span class="line">		<span class="keyword">if</span> (kcmp &gt; <span class="number">0</span>)</span><br><span class="line">			rbp = rbp-&gt;rb_right;</span><br><span class="line">		<span class="keyword">else</span> <span class="keyword">if</span> (kcmp &lt; <span class="number">0</span>)</span><br><span class="line">			rbp = rbp-&gt;rb_left;</span><br><span class="line">		<span class="keyword">else</span> &#123;</span><br><span class="line">			epir = epi;</span><br><span class="line">			<span class="keyword">break</span>;</span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> epir;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="4-EPOLL-CTL-ADD情况"><a href="#4-EPOLL-CTL-ADD情况" class="headerlink" title="4. EPOLL_CTL_ADD情况"></a>4. EPOLL_CTL_ADD情况</h3><p>接下来switch这块区域的代码就是整个epoll_ctl函数的核心，对op进行switch出来的有添加(EPOLL_CTL_ADD)、删除(EPOLL_CTL_DEL)和修改(EPOLL_CTL_MOD)三种情况，这里我以添加为例讲解，其他两种情况类似，知道了如何添加监听事件，其他删除和修改监听事件都可以举一反三。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">case</span> EPOLL_CTL_ADD:</span><br><span class="line">	<span class="keyword">if</span> (!epi) &#123;</span><br><span class="line">		<span class="comment">// epds 是 epollevent</span></span><br><span class="line">		epds.events |= POLLERR | POLLHUP;</span><br><span class="line">		error = ep_insert(ep, &amp;epds, tfile, fd);</span><br><span class="line">	&#125; <span class="keyword">else</span></span><br><span class="line">		error = -EEXIST;</span><br><span class="line">	<span class="keyword">break</span>;</span><br></pre></td></tr></table></figure>
-
-<p>为目标文件添加监控事件时，首先要保证当前ep里面还没有对该目标文件进行监听，如果存在(epi不为空)，就返回-EEXIST错误。否则说明参数正常，然后先默认设置对目标文件的POLLERR和POLLHUP监听事件，然后调用ep_insert函数，将对目标文件的监听事件插入到ep维护的红黑树里面,下面是ep_insert的源码：</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// fs.eventpoll.c</span></span><br><span class="line"><span class="type">static</span> <span class="type">int</span> <span class="title function_">ep_insert</span><span class="params">(<span class="keyword">struct</span> eventpoll *ep, <span class="keyword">struct</span> epoll_event *event,</span></span><br><span class="line"><span class="params">		     <span class="keyword">struct</span> file *tfile, <span class="type">int</span> fd)</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="type">int</span> error, revents, pwake = <span class="number">0</span>;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> flags;</span><br><span class="line">	<span class="type">long</span> user_watches;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">epitem</span> *<span class="title">epi</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">ep_pqueue</span> <span class="title">epq</span>;</span></span><br><span class="line">	</span><br><span class="line">	<span class="comment">// 检查 epoll 实例中的监视数是否超过上限</span></span><br><span class="line">	user_watches = atomic_long_read(&amp;ep-&gt;user-&gt;epoll_watches);</span><br><span class="line">	<span class="keyword">if</span> (unlikely(user_watches &gt;= max_user_watches))</span><br><span class="line">		<span class="keyword">return</span> -ENOSPC;</span><br><span class="line">	</span><br><span class="line">	<span class="comment">// 分配 epitem 项结构体</span></span><br><span class="line">	<span class="keyword">if</span> (!(epi = kmem_cache_alloc(epi_cache, GFP_KERNEL)))</span><br><span class="line">		<span class="keyword">return</span> -ENOMEM;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// epi 初始化</span></span><br><span class="line">	INIT_LIST_HEAD(&amp;epi-&gt;rdllink);</span><br><span class="line">	INIT_LIST_HEAD(&amp;epi-&gt;fllink);</span><br><span class="line">	INIT_LIST_HEAD(&amp;epi-&gt;pwqlist);</span><br><span class="line">	epi-&gt;ep = ep;</span><br><span class="line">	ep_set_ffd(&amp;epi-&gt;ffd, tfile, fd);</span><br><span class="line">	epi-&gt;event = *event;</span><br><span class="line">	epi-&gt;nwait = <span class="number">0</span>;</span><br><span class="line">	epi-&gt;next = EP_UNACTIVE_PTR;</span><br><span class="line"></span><br><span class="line">	epq.epi = epi;</span><br><span class="line">	<span class="comment">// 初始化回调函数</span></span><br><span class="line">	init_poll_funcptr(&amp;epq.pt, ep_ptable_queue_proc);</span><br><span class="line"></span><br><span class="line">	<span class="comment">//  将回调函数 ep_ptable_queue_proc 与 tfile 文件关联起来，以及获取当前文件的事件位</span></span><br><span class="line">	revents = tfile-&gt;f_op-&gt;poll(tfile, &amp;epq.pt);</span><br><span class="line"></span><br><span class="line">	error = -ENOMEM;</span><br><span class="line">	<span class="keyword">if</span> (epi-&gt;nwait &lt; <span class="number">0</span>)</span><br><span class="line">		<span class="keyword">goto</span> error_unregister;</span><br><span class="line"></span><br><span class="line">	<span class="comment">// 调用list_add_tail_rcu将当前监听项添加到目标文件的f_ep_links链表里面</span></span><br><span class="line">	<span class="comment">// 该链表是目标文件的epoll钩子链表，所有对该目标文件进行监听的监听项都会加入到该链表里面。</span></span><br><span class="line">	spin_lock(&amp;tfile-&gt;f_lock);</span><br><span class="line">	list_add_tail(&amp;epi-&gt;fllink, &amp;tfile-&gt;f_ep_links);</span><br><span class="line">	spin_unlock(&amp;tfile-&gt;f_lock);</span><br><span class="line"></span><br><span class="line"></span><br><span class="line">	<span class="comment">// 将epi监听项添加到ep维护的红黑树里面</span></span><br><span class="line">	ep_rbtree_insert(ep, epi);</span><br><span class="line"></span><br><span class="line">	spin_lock_irqsave(&amp;ep-&gt;lock, flags);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> ((revents &amp; event-&gt;events) &amp;&amp; !ep_is_linked(&amp;epi-&gt;rdllink)) &#123;</span><br><span class="line">		list_add_tail(&amp;epi-&gt;rdllink, &amp;ep-&gt;rdllist);</span><br><span class="line"></span><br><span class="line">		<span class="keyword">if</span> (waitqueue_active(&amp;ep-&gt;wq))</span><br><span class="line">			wake_up_locked(&amp;ep-&gt;wq);</span><br><span class="line">		<span class="keyword">if</span> (waitqueue_active(&amp;ep-&gt;poll_wait))</span><br><span class="line">			pwake++;</span><br><span class="line">	&#125;</span><br><span class="line"></span><br><span class="line">	spin_unlock_irqrestore(&amp;ep-&gt;lock, flags);</span><br><span class="line"></span><br><span class="line">	atomic_long_inc(&amp;ep-&gt;user-&gt;epoll_watches);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">if</span> (pwake)</span><br><span class="line">		ep_poll_safewake(&amp;ep-&gt;poll_wait);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line"></span><br><span class="line">error_unregister:</span><br><span class="line">	ep_unregister_pollwait(ep, epi);</span><br><span class="line"></span><br><span class="line">	spin_lock_irqsave(&amp;ep-&gt;lock, flags);</span><br><span class="line">	<span class="keyword">if</span> (ep_is_linked(&amp;epi-&gt;rdllink))</span><br><span class="line">		list_del_init(&amp;epi-&gt;rdllink);</span><br><span class="line">	spin_unlock_irqrestore(&amp;ep-&gt;lock, flags);</span><br><span class="line"></span><br><span class="line">	kmem_cache_free(epi_cache, epi);</span><br><span class="line"></span><br><span class="line">	<span class="keyword">return</span> error;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>在调用epoll_ctl时，可能会产生相关进程需要监听的事件，如果有监听的事件产生，(revents &amp; event-&gt;events 为 true)，并且目标文件相关的监听项没有链接到ep的准备链表rdlist里面的话，就将该监听项添加到ep的rdlist准备链表里面，rdlist链接的是该epoll描述符监听的所有已经就绪的目标文件的监听项。并且，如果有任务在等待产生事件时，就调用wake_up_locked函数唤醒所有正在等待的任务，处理相应的事件。当进程调用epoll_wait时，该进程就出现在ep的wq等待队列里面。</p>
-<hr>
-<p><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/include/linux/rcupdate.h#L60">回调函数</a></p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;linux/rcupdate.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">my_data</span> &#123;</span></span><br><span class="line">    <span class="comment">// 数据结构的定义</span></span><br><span class="line">    <span class="type">int</span> value;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">rcu_head</span> <span class="title">rcu</span>;</span>  <span class="comment">// 包含在数据结构中的 struct rcu_head</span></span><br><span class="line">&#125;;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 初始化数据结构并将其插入 RCU 队列</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">enqueue_for_removal</span><span class="params">(<span class="keyword">struct</span> my_data *data)</span> &#123;</span><br><span class="line">    call_rcu(&amp;data-&gt;rcu, my_data_free_callback);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 实际的释放回调函数</span></span><br><span class="line"><span class="type">void</span> <span class="title function_">my_data_free_callback</span><span class="params">(<span class="keyword">struct</span> rcu_head *head)</span> &#123;</span><br><span class="line">    <span class="class"><span class="keyword">struct</span> <span class="title">my_data</span> *<span class="title">data</span> =</span> container_of(head, <span class="keyword">struct</span> my_data, rcu);</span><br><span class="line">    kfree(data);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/ipv4/tcp_input.c#L5401">sk_data_ready</a><br><a target="_blank" rel="noopener" href="https://elixir.bootlin.com/linux/v2.6.39.4/source/net/core/sock.c#L1904">sock_def_readable</a></p>
-
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/12/18/%E4%B8%AD%E4%BD%8D%E6%95%B0%E8%B4%AA%E5%BF%83/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/12/18/%E4%B8%AD%E4%BD%8D%E6%95%B0%E8%B4%AA%E5%BF%83/" class="post-title-link" itemprop="url">中位数贪心</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-12-18 15:00:30" itemprop="dateCreated datePublished" datetime="2023-12-18T15:00:30+08:00">2023-12-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <p>今天刷力扣第376周赛，后三道题全是<code>中位数贪心</code>，之前从来没做过这种类型的题目，记录一下学习博客。<br>这里推荐<a target="_blank" rel="noopener" href="https://www.bilibili.com/video/BV1994y1A7oo/?spm_id_from=333.337.search-card.all.click">灵神</a>的视频讲解。</p>
-<p>一个很经典的问题：</p>
-<p>一个有序数组，寻找一个数字，使得所有数到达这个数的距离（数值差）最短。</p>
-<p>举个极端的例子：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1 1 1 1 996</span><br></pre></td></tr></table></figure>
-
-<p>这个数字取数组的平均值:200，距离和是: 199 * 3 + (996 - 250) &#x3D; 1343<br>这个数字取数组的中位数:1,距离和是：996 - 1</p>
-<p>相较之下取中位数比平均数更短，但是为了严谨，还是简单证明一下：</p>
-<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">a0 a1 a2 a3 ... an</span><br></pre></td></tr></table></figure>
-<p>1 3 5</p>
-<p>如果取的数字在a0的左侧，那么如果这个数字加一依旧在a0的左侧，那么显而易见：总距离和会减少 n ；如果在an的右侧，也是同理。<br>如果取得数字在a0到a1之间如果该数字加一依旧在a0到a1之间，那么总距离就会减少 n - 1 - 1。如果是右侧(an-1 到 an之间)也是同理。<br>以此类推，到达中位数的时候就是最短距离。（平均数也可以用类似的方法推导）。<a target="_blank" rel="noopener" href="https://www.cnblogs.com/xidian-mao/p/7819928.html">简单证明</a>。</p>
-<p>难绷的是我想到了思路，但是代码一直写不出来，还是太菜了。最终代码还是抄的灵神代码（不得不说，写的比我那上不了台面的代码优雅的多）。</p>
-<figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br></pre></td><td class="code"><pre><span class="line"><span class="built_in">vector</span>&lt;<span class="type">int</span>&gt; palin;</span><br><span class="line"><span class="keyword">auto</span> init = [] &#123;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> base = <span class="number">1</span>;base &lt;= <span class="number">10000</span>;base*=<span class="number">10</span>) &#123;</span><br><span class="line">        <span class="comment">// 奇数</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">            <span class="type">int</span> num = i;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> m = i / <span class="number">10</span>;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            palin.push_back(num);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 偶数</span></span><br><span class="line">       <span class="keyword">if</span>(base &lt;= <span class="number">1000</span>)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">                <span class="type">int</span> num = i;</span><br><span class="line">                <span class="keyword">for</span>(<span class="type">int</span> m = i;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                    num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                palin.push_back(num);</span><br><span class="line">            &#125;</span><br><span class="line">       &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    palin.push_back(<span class="number">1&#x27;000&#x27;000&#x27;001</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;();</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> &#123;</span></span><br><span class="line">public:</span><br><span class="line">    <span class="type">long</span> <span class="type">long</span> <span class="title function_">minimumCost</span><span class="params">(<span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;&amp; nums)</span> &#123;</span><br><span class="line">        sort(nums.begin(),nums.end());</span><br><span class="line">        <span class="type">int</span> n = nums.size();</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">auto</span> distance = [&amp;](<span class="type">int</span> i) -&gt; <span class="type">long</span> <span class="type">long</span> &#123;</span><br><span class="line">            <span class="type">long</span> <span class="type">long</span> sum = <span class="number">0</span>;</span><br><span class="line">            <span class="type">int</span> target = palin[i];</span><br><span class="line">            <span class="keyword">for</span>(<span class="keyword">auto</span>&amp; e : nums) &#123;</span><br><span class="line">                sum += <span class="built_in">abs</span>(e - target);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> sum;</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        <span class="type">int</span> i = lower_bound(palin.begin(),palin.end(),nums[(n<span class="number">-1</span>)/<span class="number">2</span>]) - palin.begin();</span><br><span class="line">        <span class="keyword">if</span>(palin[i] &lt;= nums[n / <span class="number">2</span>])  <span class="keyword">return</span> distance(i);</span><br><span class="line">        <span class="keyword">return</span> min(distance(i),distance(i - <span class="number">1</span>));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/12/04/Learn-DGB/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/12/04/Learn-DGB/" class="post-title-link" itemprop="url">Learn DGB</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-12-04 17:18:39" itemprop="dateCreated datePublished" datetime="2023-12-04T17:18:39+08:00">2023-12-04</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p><code>GDB 的全称是 GNU Debugger</code></p>
-<p>“Caveman debugging” 这个词语的使用是一种夸张和幽默的说法，强调了使用最基本工具进行调试的原始感觉，好像程序员是在用石器时代的工具一样。不要只会最简单的调试，掌握更切近实际的高效技巧会为你调试工作带来不小的便利。</p>
           <!--noindex-->
             <div class="post-button">
-              <a class="btn" href="/2023/12/04/Learn-DGB/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/10/18/%E4%B8%AD%E6%96%AD%E5%92%8C%E5%8A%A8%E6%80%81%E6%97%B6%E9%92%9F%E6%98%BE%E7%A4%BA/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/10/18/%E4%B8%AD%E6%96%AD%E5%92%8C%E5%8A%A8%E6%80%81%E6%97%B6%E9%92%9F%E6%98%BE%E7%A4%BA/" class="post-title-link" itemprop="url">中断和动态时钟显示</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-10-18 22:47:06" itemprop="dateCreated datePublished" datetime="2023-10-18T22:47:06+08:00">2023-10-18</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="外部硬件中断"><a href="#外部硬件中断" class="headerlink" title="外部硬件中断"></a>外部硬件中断</h3><p>外部硬件中断就是从处理器外面来的中断信号，优先级很高。</p>
-<p>它的实现是通过两个信号线引入处理器内部的，分别叫<code>NMI</code>和<code>INTR</code>。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2023/10/18/%E4%B8%AD%E6%96%AD%E5%92%8C%E5%8A%A8%E6%80%81%E6%97%B6%E9%92%9F%E6%98%BE%E7%A4%BA/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/10/14/%E5%8A%A0%E8%BD%BD%E7%A8%8B%E5%BA%8F%EF%BC%88%E5%99%A8%EF%BC%89%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%A8%8B/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/10/14/%E5%8A%A0%E8%BD%BD%E7%A8%8B%E5%BA%8F%EF%BC%88%E5%99%A8%EF%BC%89%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%A8%8B/" class="post-title-link" itemprop="url">加载程序（器）的工作流程</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-10-14 18:07:34" itemprop="dateCreated datePublished" datetime="2023-10-14T18:07:34+08:00">2023-10-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="用户程序头部"><a href="#用户程序头部" class="headerlink" title="用户程序头部"></a>用户程序头部</h3><p>我们知道编译器编译的用户程序和加载器实际上是在不同时间、不同地方、不同的人开发的。因此，双方都不了解对象的结构和功能，此时就需要一个结构来传达必要的信息。在看下面的文章时候最好能完全掌握<a href="https://zhendewokusi.github.io/2023/10/14/%E5%9C%B0%E5%9D%80%E3%80%81section%E3%80%81vstart/#more">地址、section、vstart</a>的内容。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2023/10/14/%E5%8A%A0%E8%BD%BD%E7%A8%8B%E5%BA%8F%EF%BC%88%E5%99%A8%EF%BC%89%E7%9A%84%E5%B7%A5%E4%BD%9C%E6%B5%81%E7%A8%8B/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/10/14/%E5%9C%B0%E5%9D%80%E3%80%81section%E3%80%81vstart/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/10/14/%E5%9C%B0%E5%9D%80%E3%80%81section%E3%80%81vstart/" class="post-title-link" itemprop="url">地址、section、vstart</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-10-14 14:55:49" itemprop="dateCreated datePublished" datetime="2023-10-14T14:55:49+08:00">2023-10-14</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>我在学习汇编的时候，对于<code>vstart</code>的概念其实很模糊，感觉会又感觉不是很会，要说哪儿不会有说不出来，就很难受。<code>vstart</code>是<code>section</code>中的概念，但是要讲清楚什么是<code>section</code>，就必须说说什么是地址了。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2023/10/14/%E5%9C%B0%E5%9D%80%E3%80%81section%E3%80%81vstart/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2023/10/12/%E6%9D%A1%E6%AC%BE25/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2023/10/12/%E6%9D%A1%E6%AC%BE25/" class="post-title-link" itemprop="url">条款25:针对右值引用实施std::move，针对万能引用实施std::forward</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2023-10-12 20:35:45" itemprop="dateCreated datePublished" datetime="2023-10-12T20:35:45+08:00">2023-10-12</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-02-06 22:27:07" itemprop="dateModified" datetime="2024-02-06T22:27:07+08:00">2024-02-06</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h3 id="重载？"><a href="#重载？" class="headerlink" title="重载？"></a>重载？</h3><p>在条款23的基础上，再来细说一下<code>std::move</code>和<code>std::forward</code>。看这个例子：</p>
-<figure class="highlight cpp"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::<span class="built_in">move</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>看着好像一切安好。
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2023/10/12/%E6%9D%A1%E6%AC%BE25/#more" rel="contents">
+              <a class="btn" href="/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/#more" rel="contents">
                 阅读全文 &raquo;
               </a>
             </div>
@@ -1002,7 +1082,7 @@
 
   
   <nav class="pagination">
-    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
+    <span class="page-number current">1</span><a class="page-number" href="/page/2/">2</a><a class="page-number" href="/page/3/">3</a><a class="extend next" rel="next" href="/page/2/"><i class="fa fa-angle-right" aria-label="下一页"></i></a>
   </nav>
 
 
@@ -1070,14 +1150,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">17</span>
+          <span class="site-state-item-count">23</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">9</span>
+        <span class="site-state-item-count">10</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>
