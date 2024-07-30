@@ -551,6 +551,70 @@ static void __rb_erase_color(struct rb_node *node, struct rb_node *parent,
 		node->rb_color = RB_BLACK;
 }
 ```
+
+### 寻找
+
+能看懂插入和删除的逻辑，那么寻找的逻辑应该没什么难度，直接放代码吧，看两眼就懂了，比前面简单多了。
+```c
+/*获取红黑树的最小节点*/
+struct rb_node *rb_first(struct rb_root *root)
+{
+	struct rb_node	*n;
+
+	n = root->rb_node;
+	if (!n)
+		return NULL;
+	while (n->rb_left)
+		n = n->rb_left;
+	return n;
+}
+
+/*获取红黑树的最大节点*/
+struct rb_node *rb_last(struct rb_root *root)
+{
+	struct rb_node	*n;
+
+	n = root->rb_node;
+	if (!n)
+		return NULL;
+	while (n->rb_right)
+		n = n->rb_right;
+	return n;
+}
+
+/*获取给定节点在红黑树中的下一个节点*/
+struct rb_node *rb_next(struct rb_node *node)
+{
+	if (node->rb_right) {
+		node = node->rb_right; 
+		while (node->rb_left)
+			node=node->rb_left;
+		return node;
+	}
+
+	while (node->rb_parent && node == node->rb_parent->rb_right)
+		node = node->rb_parent;
+
+	return node->rb_parent;
+}
+
+/*获取给定节点在红黑树中的前一个节点*/
+struct rb_node *rb_prev(struct rb_node *node)
+{
+	if (node->rb_left) {
+		node = node->rb_left; 
+		while (node->rb_right)
+			node=node->rb_right;
+		return node;
+	}
+
+	while (node->rb_parent && node == node->rb_parent->rb_left)
+		node = node->rb_parent;
+
+	return node->rb_parent;
+}
+```
+
 最后十分推荐去参考资料中的红黑树操作动画中实际操作一下，理解会更深入。
 
 # 参考资料
