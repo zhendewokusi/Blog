@@ -302,24 +302,6 @@
       </tags>
   </entry>
   <entry>
-    <title>bochs安装教程</title>
-    <url>/2024/01/17/bochs%E5%AE%89%E8%A3%85%E6%95%99%E7%A8%8B/</url>
-    <content><![CDATA[<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br><span class="line">CONFIGURE_ARGS=&quot;--enable-debugger --enable-readline&quot;</span><br></pre></td></tr></table></figure>
-
-<p>先改<code>.conf.linux</code>，里面的</p>
-<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br></pre></td></tr></table></figure>
-
-<p>再使用：</p>
-<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">sh .conf.linux </span><br></pre></td></tr></table></figure>
-<p>然后在Makefile里面操作:</p>
-<p>我是在vscode中,Ctrl+F，将所有的<code>bochs</code>更改成<code>bochs_gdb</code>，接着将<code>bochs_gdb.h</code>更改为<code>bochs.h</code>,<code>wxbochs_gdb.rc</code>更改为<code>wxbochs.rc</code>，后面这个应该没影响，是和win有关系的，但是保险起见还是改了吧，然后进行<code>make -j16 &amp;&amp; sudo make install</code>。</p>
-]]></content>
-      <tags>
-        <tag>真相还原</tag>
-        <tag>bochs</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>TCP 超时计时器的管理</title>
     <url>/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/</url>
     <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
@@ -369,6 +351,24 @@
 ]]></content>
       <tags>
         <tag>TCP</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>bochs安装教程</title>
+    <url>/2024/01/17/bochs%E5%AE%89%E8%A3%85%E6%95%99%E7%A8%8B/</url>
+    <content><![CDATA[<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br><span class="line">CONFIGURE_ARGS=&quot;--enable-debugger --enable-readline&quot;</span><br></pre></td></tr></table></figure>
+
+<p>先改<code>.conf.linux</code>，里面的</p>
+<figure class="highlight plaintext"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br></pre></td></tr></table></figure>
+
+<p>再使用：</p>
+<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">sh .conf.linux </span><br></pre></td></tr></table></figure>
+<p>然后在Makefile里面操作:</p>
+<p>我是在vscode中,Ctrl+F，将所有的<code>bochs</code>更改成<code>bochs_gdb</code>，接着将<code>bochs_gdb.h</code>更改为<code>bochs.h</code>,<code>wxbochs_gdb.rc</code>更改为<code>wxbochs.rc</code>，后面这个应该没影响，是和win有关系的，但是保险起见还是改了吧，然后进行<code>make -j16 &amp;&amp; sudo make install</code>。</p>
+]]></content>
+      <tags>
+        <tag>真相还原</tag>
+        <tag>bochs</tag>
       </tags>
   </entry>
   <entry>
@@ -595,6 +595,87 @@
       </tags>
   </entry>
   <entry>
+    <title>函数声明</title>
+    <url>/2023/10/11/%E5%87%BD%E6%95%B0%E5%A3%B0%E6%98%8E/</url>
+    <content><![CDATA[<h3 id="正确理解函数声明"><a href="#正确理解函数声明" class="headerlink" title="正确理解函数声明"></a>正确理解函数声明</h3><p>看书的时候看到一个很抽象的语句：<br><code>(*(void(*)())0)();</code><br>想必每个C程序员看到这条语句都会觉得难绷。这个表达式实际上是在尝试调用位于地址0处的函数指针。在大多数操作系统中，访问地址0通常是非法的，因为它可能导致程序崩溃或产生未定义的行为。这种操作在一些特殊的底层编程场景中可能有用，但在通常的应用程序中应该避免使用，因为它不安全且不可移植。</p>
+<span id="more"></span>
+
+
+<p>请各位牢记一条十分简单的规则：<strong>按照使用的方式来声明。</strong></p>
+<h4 id="声明符与表达式"><a href="#声明符与表达式" class="headerlink" title="声明符与表达式"></a>声明符与表达式</h4><p>声明符（Declaration Specifier）和表达式（Expression）是编程中的两个不同概念，它们有以下异同点：</p>
+<p><strong>相同点</strong>：</p>
+<ol>
+<li><p><strong>语法元素</strong>：声明符和表达式都是编程语言的语法元素，它们用于构建和操作程序中的数据和操作。</p>
+</li>
+<li><p><strong>用途</strong>：声明符用于声明（或定义）变量、函数、类型或其他标识符，以便程序正确识别和使用这些标识符。表达式用于表示和计算值，它可以包括操作数和操作符，用于执行特定的计算操作。</p>
+</li>
+</ol>
+<p><strong>不同点</strong>：</p>
+<ol>
+<li><p><strong>含义和作用</strong>：</p>
+<ul>
+<li><strong>声明符</strong> 用于描述标识符的性质和类型，但不执行计算或操作。它告诉编译器如何分配内存和如何解释标识符的内容。</li>
+<li><strong>表达式</strong> 用于表示和计算值，执行特定的计算操作，返回一个结果。表达式可以包括常量、变量、运算符和函数调用等，用于生成新的值。</li>
+</ul>
+</li>
+<li><p><strong>例子</strong>：</p>
+<ul>
+<li>声明符示例：<code>int x;</code>（声明一个整数变量x）、<code>void myFunction();</code>（声明一个没有返回值的函数myFunction）。</li>
+<li>表达式示例：<code>x + 5</code>（计算x与5的和，返回一个值）、<code>myFunction()</code>（调用函数myFunction，返回其结果）。</li>
+</ul>
+</li>
+<li><p><strong>上下文</strong>：</p>
+<ul>
+<li><strong>声明符</strong> 通常出现在变量、函数、类型或其他标识符的声明语句中，例如在变量声明、函数原型、结构体定义等地方。</li>
+<li><strong>表达式</strong> 通常出现在赋值语句、算术运算、逻辑运算、函数调用等地方，用于执行操作和计算值。</li>
+</ul>
+</li>
+</ol>
+<p>总之，声明符用于描述标识符的性质和类型，而表达式用于表示和计算值。它们在编程中扮演不同的角色，但都是构建程序逻辑的重要组成部分。</p>
+<h4 id="声明"><a href="#声明" class="headerlink" title="声明"></a>声明</h4><p>任何的C变量的声明都由两部分组成：类型，声明符。最简单的声明符就是单个变量，比如：</p>
+<p><code>int tmp;</code></p>
+<p>这个声明的含义是：当对其求值时，tmp的类型是<code>int</code>。<br>当然也可以这样写：</p>
+<p><code>int ((tmp));</code></p>
+<p>这个声明的含义是：当对其求值时，((tmp))的类型是<code>int</code>型，因此也可以推出来tmp的类型是<code>int</code>。<br>同理的逻辑也适用于函数和指针的声明：</p>
+<p><code>double func();</code></p>
+<p>这个声明的含义是：<code>func()</code>求值的结果是<code>double</code>类型。也就是说，<code>func</code>是一个返回值为<code>double</code>类型的函数。</p>
+<p><code>int* p;</code></p>
+<p>这个声明的含义是：<code>*p</code>是一个<code>int</code>型数据。也就是说，<code>p</code>是一个指向<code>int</code>型数据的指针。</p>
+<p>将上面的声明组合一下：</p>
+<p><code>double *func2(),(*func3)();</code></p>
+<p>表示<code>*func2()</code>和<code>(*func3())</code>都是浮点类型的声明符。因为<code>()</code>优先级高于<code>*</code>，可以得出：<br><code>func2</code>是一个函数，该函数的返回值是指向<code>double</code>类型数据的指针。<br><code>func3</code>是一个函数指针，其指向的函数的返回值类型是<code>double</code>。</p>
+<h4 id="类型转换符"><a href="#类型转换符" class="headerlink" title="类型转换符"></a>类型转换符</h4><p>类型转换符是一种在编程语言中用于改变一个值的数据类型的操作符或关键字。类型转换符允许程序员显式地指定将一个数据类型转换为另一个数据类型的方式。这种操作通常称为类型转换或强制类型转换。在理解了上面的知识点后，如果得到一个声明好的、给定类型的变量，得到它的类型转换符也就不是一件难事。例如：</p>
+<p><code>float (*tmp)();</code></p>
+<p>表示<code>tmp</code>是一个指向返回值为<code>float</code>类型的函数的指针，那么：</p>
+<p><code>float (*)()</code></p>
+<p>也就表示为一个“一个指向返回值为<code>float</code>类型的函数的指针”的类型转换符。</p>
+<p>可以看下面代码再练习练习：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">myFunction</span><span class="params">(<span class="type">char</span> *str, <span class="type">int</span> num)</span> &#123;</span><br><span class="line">    <span class="comment">// 函数实现</span></span><br><span class="line">    <span class="keyword">return</span> num * <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 声明一个函数指针，并初始化为指向myFunction的指针</span></span><br><span class="line">    <span class="type">int</span> (*h)(<span class="type">char</span> *, <span class="type">int</span>);</span><br><span class="line">    <span class="comment">// 这里的myFunction的类型就是 int (*)(char *, int),为了便于理解我就全部写出来了</span></span><br><span class="line">    h = (<span class="type">int</span> (*)(<span class="type">char</span> *, <span class="type">int</span>))myFunction;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 现在可以使用h来调用函数</span></span><br><span class="line">    <span class="type">int</span> result = h(<span class="string">&quot;Hello&quot;</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, result);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>注意：</p>
+<p><code>(*fp)();</code></p>
+<p>fp是一个<strong>函数指针</strong>，那么<code>*fp</code>就是该指针指向的函数，所以<code>(*fp)()</code>就是调用这个函数的方式。但是，ANSI C 标准允许程序员将上式子简写成<code>fp()</code>，这只是一种<strong>简写</strong>。</p>
+<p>看的仔细的读者就会发现，我上面代码调用函数也使用了简写。因此我上面的代码中：<code>int result = h(&quot;Hello&quot;, 1);</code>实际上是<code>int result = (*h)(&quot;Hello&quot;, 1);</code>。</p>
+<h4 id="解答"><a href="#解答" class="headerlink" title="解答"></a>解答</h4><p><code>(*(void(*)())0)();</code>被设计的目的是为了在计算机启动的时候，硬件将调用首地址为0位置的子例程。</p>
+<p>你可能会想，为什么不直接：</p>
+<p><code>(* 0)()</code></p>
+<p>可惜编译器是笨重的。因为运算符<code>*</code>必须要一个指针来进行解引用。而且这个指针还应该是一个函数指针，这样经过运算符<code>*</code>作用后的结果才能作为函数被调用。因此，上式子对<code>0</code>要进行强制类型转换为一个“指向返回值为void类型的函数的指针”。因此就有了下式：</p>
+<p><code>(*(void(*)())0)();</code>,让我解释一下这个表达式的各个部分：</p>
+<ol>
+<li><p><code>void(*)()</code>：这部分表示一个函数指针类型，它指向一个没有参数并且没有返回值的函数。这是一个函数指针类型的定义，但没有指向任何有效函数。</p>
+</li>
+<li><p><code>0</code>：这是一个空指针，它不指向任何内存地址。</p>
+</li>
+<li><p><code>(*(void(*)())0)</code>：这部分将空指针转换为一个函数指针，然后尝试通过解引用这个函数指针来调用一个函数。</p>
+</li>
+<li><p>最后的 <code>();</code> 尝试调用解引用的函数指针，但由于函数指针不指向有效函数，这会导致未定义行为，通常会导致程序崩溃或其他不可预测的结果。</p>
+</li>
+</ol>
+]]></content>
+      <tags>
+        <tag>C语言</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>中断和动态时钟显示</title>
     <url>/2023/10/18/%E4%B8%AD%E6%96%AD%E5%92%8C%E5%8A%A8%E6%80%81%E6%97%B6%E9%92%9F%E6%98%BE%E7%A4%BA/</url>
     <content><![CDATA[<h3 id="外部硬件中断"><a href="#外部硬件中断" class="headerlink" title="外部硬件中断"></a>外部硬件中断</h3><p>外部硬件中断就是从处理器外面来的中断信号，优先级很高。</p>
@@ -705,95 +786,6 @@
 ]]></content>
       <tags>
         <tag>x86汇编</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>内核模块添加</title>
-    <url>/2024/06/04/%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97%E6%B7%BB%E5%8A%A0/</url>
-    <content><![CDATA[]]></content>
-      <tags>
-        <tag>内核</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>函数声明</title>
-    <url>/2023/10/11/%E5%87%BD%E6%95%B0%E5%A3%B0%E6%98%8E/</url>
-    <content><![CDATA[<h3 id="正确理解函数声明"><a href="#正确理解函数声明" class="headerlink" title="正确理解函数声明"></a>正确理解函数声明</h3><p>看书的时候看到一个很抽象的语句：<br><code>(*(void(*)())0)();</code><br>想必每个C程序员看到这条语句都会觉得难绷。这个表达式实际上是在尝试调用位于地址0处的函数指针。在大多数操作系统中，访问地址0通常是非法的，因为它可能导致程序崩溃或产生未定义的行为。这种操作在一些特殊的底层编程场景中可能有用，但在通常的应用程序中应该避免使用，因为它不安全且不可移植。</p>
-<span id="more"></span>
-
-
-<p>请各位牢记一条十分简单的规则：<strong>按照使用的方式来声明。</strong></p>
-<h4 id="声明符与表达式"><a href="#声明符与表达式" class="headerlink" title="声明符与表达式"></a>声明符与表达式</h4><p>声明符（Declaration Specifier）和表达式（Expression）是编程中的两个不同概念，它们有以下异同点：</p>
-<p><strong>相同点</strong>：</p>
-<ol>
-<li><p><strong>语法元素</strong>：声明符和表达式都是编程语言的语法元素，它们用于构建和操作程序中的数据和操作。</p>
-</li>
-<li><p><strong>用途</strong>：声明符用于声明（或定义）变量、函数、类型或其他标识符，以便程序正确识别和使用这些标识符。表达式用于表示和计算值，它可以包括操作数和操作符，用于执行特定的计算操作。</p>
-</li>
-</ol>
-<p><strong>不同点</strong>：</p>
-<ol>
-<li><p><strong>含义和作用</strong>：</p>
-<ul>
-<li><strong>声明符</strong> 用于描述标识符的性质和类型，但不执行计算或操作。它告诉编译器如何分配内存和如何解释标识符的内容。</li>
-<li><strong>表达式</strong> 用于表示和计算值，执行特定的计算操作，返回一个结果。表达式可以包括常量、变量、运算符和函数调用等，用于生成新的值。</li>
-</ul>
-</li>
-<li><p><strong>例子</strong>：</p>
-<ul>
-<li>声明符示例：<code>int x;</code>（声明一个整数变量x）、<code>void myFunction();</code>（声明一个没有返回值的函数myFunction）。</li>
-<li>表达式示例：<code>x + 5</code>（计算x与5的和，返回一个值）、<code>myFunction()</code>（调用函数myFunction，返回其结果）。</li>
-</ul>
-</li>
-<li><p><strong>上下文</strong>：</p>
-<ul>
-<li><strong>声明符</strong> 通常出现在变量、函数、类型或其他标识符的声明语句中，例如在变量声明、函数原型、结构体定义等地方。</li>
-<li><strong>表达式</strong> 通常出现在赋值语句、算术运算、逻辑运算、函数调用等地方，用于执行操作和计算值。</li>
-</ul>
-</li>
-</ol>
-<p>总之，声明符用于描述标识符的性质和类型，而表达式用于表示和计算值。它们在编程中扮演不同的角色，但都是构建程序逻辑的重要组成部分。</p>
-<h4 id="声明"><a href="#声明" class="headerlink" title="声明"></a>声明</h4><p>任何的C变量的声明都由两部分组成：类型，声明符。最简单的声明符就是单个变量，比如：</p>
-<p><code>int tmp;</code></p>
-<p>这个声明的含义是：当对其求值时，tmp的类型是<code>int</code>。<br>当然也可以这样写：</p>
-<p><code>int ((tmp));</code></p>
-<p>这个声明的含义是：当对其求值时，((tmp))的类型是<code>int</code>型，因此也可以推出来tmp的类型是<code>int</code>。<br>同理的逻辑也适用于函数和指针的声明：</p>
-<p><code>double func();</code></p>
-<p>这个声明的含义是：<code>func()</code>求值的结果是<code>double</code>类型。也就是说，<code>func</code>是一个返回值为<code>double</code>类型的函数。</p>
-<p><code>int* p;</code></p>
-<p>这个声明的含义是：<code>*p</code>是一个<code>int</code>型数据。也就是说，<code>p</code>是一个指向<code>int</code>型数据的指针。</p>
-<p>将上面的声明组合一下：</p>
-<p><code>double *func2(),(*func3)();</code></p>
-<p>表示<code>*func2()</code>和<code>(*func3())</code>都是浮点类型的声明符。因为<code>()</code>优先级高于<code>*</code>，可以得出：<br><code>func2</code>是一个函数，该函数的返回值是指向<code>double</code>类型数据的指针。<br><code>func3</code>是一个函数指针，其指向的函数的返回值类型是<code>double</code>。</p>
-<h4 id="类型转换符"><a href="#类型转换符" class="headerlink" title="类型转换符"></a>类型转换符</h4><p>类型转换符是一种在编程语言中用于改变一个值的数据类型的操作符或关键字。类型转换符允许程序员显式地指定将一个数据类型转换为另一个数据类型的方式。这种操作通常称为类型转换或强制类型转换。在理解了上面的知识点后，如果得到一个声明好的、给定类型的变量，得到它的类型转换符也就不是一件难事。例如：</p>
-<p><code>float (*tmp)();</code></p>
-<p>表示<code>tmp</code>是一个指向返回值为<code>float</code>类型的函数的指针，那么：</p>
-<p><code>float (*)()</code></p>
-<p>也就表示为一个“一个指向返回值为<code>float</code>类型的函数的指针”的类型转换符。</p>
-<p>可以看下面代码再练习练习：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">myFunction</span><span class="params">(<span class="type">char</span> *str, <span class="type">int</span> num)</span> &#123;</span><br><span class="line">    <span class="comment">// 函数实现</span></span><br><span class="line">    <span class="keyword">return</span> num * <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 声明一个函数指针，并初始化为指向myFunction的指针</span></span><br><span class="line">    <span class="type">int</span> (*h)(<span class="type">char</span> *, <span class="type">int</span>);</span><br><span class="line">    <span class="comment">// 这里的myFunction的类型就是 int (*)(char *, int),为了便于理解我就全部写出来了</span></span><br><span class="line">    h = (<span class="type">int</span> (*)(<span class="type">char</span> *, <span class="type">int</span>))myFunction;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 现在可以使用h来调用函数</span></span><br><span class="line">    <span class="type">int</span> result = h(<span class="string">&quot;Hello&quot;</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, result);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>注意：</p>
-<p><code>(*fp)();</code></p>
-<p>fp是一个<strong>函数指针</strong>，那么<code>*fp</code>就是该指针指向的函数，所以<code>(*fp)()</code>就是调用这个函数的方式。但是，ANSI C 标准允许程序员将上式子简写成<code>fp()</code>，这只是一种<strong>简写</strong>。</p>
-<p>看的仔细的读者就会发现，我上面代码调用函数也使用了简写。因此我上面的代码中：<code>int result = h(&quot;Hello&quot;, 1);</code>实际上是<code>int result = (*h)(&quot;Hello&quot;, 1);</code>。</p>
-<h4 id="解答"><a href="#解答" class="headerlink" title="解答"></a>解答</h4><p><code>(*(void(*)())0)();</code>被设计的目的是为了在计算机启动的时候，硬件将调用首地址为0位置的子例程。</p>
-<p>你可能会想，为什么不直接：</p>
-<p><code>(* 0)()</code></p>
-<p>可惜编译器是笨重的。因为运算符<code>*</code>必须要一个指针来进行解引用。而且这个指针还应该是一个函数指针，这样经过运算符<code>*</code>作用后的结果才能作为函数被调用。因此，上式子对<code>0</code>要进行强制类型转换为一个“指向返回值为void类型的函数的指针”。因此就有了下式：</p>
-<p><code>(*(void(*)())0)();</code>,让我解释一下这个表达式的各个部分：</p>
-<ol>
-<li><p><code>void(*)()</code>：这部分表示一个函数指针类型，它指向一个没有参数并且没有返回值的函数。这是一个函数指针类型的定义，但没有指向任何有效函数。</p>
-</li>
-<li><p><code>0</code>：这是一个空指针，它不指向任何内存地址。</p>
-</li>
-<li><p><code>(*(void(*)())0)</code>：这部分将空指针转换为一个函数指针，然后尝试通过解引用这个函数指针来调用一个函数。</p>
-</li>
-<li><p>最后的 <code>();</code> 尝试调用解引用的函数指针，但由于函数指针不指向有效函数，这会导致未定义行为，通常会导致程序崩溃或其他不可预测的结果。</p>
-</li>
-</ol>
-]]></content>
-      <tags>
-        <tag>C语言</tag>
       </tags>
   </entry>
   <entry>
@@ -957,6 +949,28 @@
       </tags>
   </entry>
   <entry>
+    <title>搭建内核调试环境</title>
+    <url>/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/</url>
+    <content><![CDATA[<ol>
+<li>下载 linux 源码，v6.10-rc2</li>
+<li>在项目根目录下执行 <code>make menuconfig</code></li>
+</ol>
+<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>Kernel hacking  —&gt;<br>    Compile-time checks and compiler options  —&gt;<br>        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;<br>            (X) Generate DWARF Version 5 debuginfo </p>
+<pre><code>[*] Provide GDB scripts for kernel debugging 
+</code></pre>
+<p>make -j8</p>
+<p>busybox 1.36.1</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line">code scripts/kconfig/lxdialog/Makefile</span><br><span class="line"><span class="meta"># always		:= $(hostprogs-y) dochecklxdialog</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">make menuconfig</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>[*] Build static binary (no shared libs)  </p>
+]]></content>
+      <tags>
+        <tag>内核</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>指针和数组</title>
     <url>/2023/10/10/%E6%8C%87%E9%92%88%E5%92%8C%E6%95%B0%E7%BB%84/</url>
     <content><![CDATA[<h3 id="指针和数组"><a href="#指针和数组" class="headerlink" title="指针和数组"></a>指针和数组</h3><p>C 语言中指针和数组这两个概念密不可分，以至于如果没有理解其中一个概念，就无法彻底理解另一个概念。</p>
@@ -987,28 +1001,6 @@
 ]]></content>
       <tags>
         <tag>C语言</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>搭建内核调试环境</title>
-    <url>/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/</url>
-    <content><![CDATA[<ol>
-<li>下载 linux 源码，v6.10-rc2</li>
-<li>在项目根目录下执行 <code>make menuconfig</code></li>
-</ol>
-<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>Kernel hacking  —&gt;<br>    Compile-time checks and compiler options  —&gt;<br>        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;<br>            (X) Generate DWARF Version 5 debuginfo </p>
-<pre><code>[*] Provide GDB scripts for kernel debugging 
-</code></pre>
-<p>make -j8</p>
-<p>busybox 1.36.1</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line">code scripts/kconfig/lxdialog/Makefile</span><br><span class="line"><span class="meta"># always		:= $(hostprogs-y) dochecklxdialog</span></span><br></pre></td></tr></table></figure>
-
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">make menuconfig</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>[*] Build static binary (no shared libs)  </p>
-]]></content>
-      <tags>
-        <tag>内核</tag>
       </tags>
   </entry>
   <entry>
@@ -1086,6 +1078,42 @@
       </tags>
   </entry>
   <entry>
+    <title>条款25:针对右值引用实施std::move，针对万能引用实施std::forward</title>
+    <url>/2023/10/12/%E6%9D%A1%E6%AC%BE25/</url>
+    <content><![CDATA[<h3 id="重载？"><a href="#重载？" class="headerlink" title="重载？"></a>重载？</h3><p>在条款23的基础上，再来细说一下<code>std::move</code>和<code>std::forward</code>。看这个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::<span class="built_in">move</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看着好像一切安好。<span id="more"></span>注意这里的<code>n</code>是局部变量，传递给<code>e.setName()</code>，调用者假定该函数对<code>n</code>只进行读操作是没有任何问题的。但是<code>setName()</code>内部使用了<code>std::move</code>将其引用的形参无条件强转成右值，因此<code>n</code>的数值就会被移入<code>e.name</code>。运行完<code>setName()</code>后，<code>n</code>就成了一个未知数。</p>
+<p>你会说：那我为啥要把形参声明称万能引用自讨苦吃，我直接为其分别重载左值和右值两个版本不就好了。你说的对，但是对的很难受。程序运行效率降低是其次，最主要的是代码难以维护以及扩展性太差。</p>
+<p>这个例子只有一个形参，还好处理，两个重载版本就行了。那么10个参数的呢？难不成你重载 (2^{10}) 个版本？有啥想不开的非要这么折磨自己。更别说有些函数模板会有无穷多个形参（比如：<code>std::make_shared</code>）</p>
+<h3 id="万能引用！"><a href="#万能引用！" class="headerlink" title="万能引用！"></a>万能引用！</h3><p>上面的例子修改如下，这样就不需要重载也能实现对应功能了：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::forward&lt;T&gt;(newName); <span class="comment">// 使用 std::forward 来保持左值或右值性质</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;NewName&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="需要注意的点"><a href="#需要注意的点" class="headerlink" title="需要注意的点"></a>需要注意的点</h3><p>假设在某个函数中，你刚开始只用了一次该对<br>象，之后就对其实施<code>std::move</code>或者<code>std::forward</code>，这没有问题，需要注意的是，随着函数不断完善，如果在该函数中不止一次地绑定到右值引用或者万能引用，就会导致上面变量<code>n</code>就成了一个未知数的错误。因此，在这种情况下，只能在最后一次使用该引用的时候对其实施<code>std::move</code>或者<code>std::forward</code>来确保其他操作时候其值依旧存在。</p>
+<h3 id="std-move-if-noexcept"><a href="#std-move-if-noexcept" class="headerlink" title="std::move_if_noexcept"></a>std::move_if_noexcept</h3><p><code>std::move_if_noexcept</code> 通常用于优化移动操作，特别是在异常安全性方面。它可以帮助在一些情况下，当移动操作不会抛出异常时，避免不必要的拷贝。</p>
+<p>这个函数的典型用例是在容器类的 <code>emplace_back</code> 和 <code>emplace</code> 成员函数中，这些函数通常要求插入元素时提供的参数（构造元素的参数）不会抛出异常。这样可以确保在插入元素时，如果构造过程抛出异常，容器的状态不会受到破坏，因为元素的构造是在容器内完成的。</p>
+<p>考虑以下示例，使用 <code>std::move_if_noexcept</code> 在 <code>emplace_back</code> 中：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">std::vector&lt;MyType&gt; myVector;</span><br><span class="line">myVector.<span class="built_in">emplace_back</span>(std::<span class="built_in">move_if_noexcept</span>(someValue));</span><br></pre></td></tr></table></figure>
+
+<p>在这里，<code>std::move_if_noexcept</code> 会检查 <code>someValue</code> 是否可以进行无异常移动，如果可以，它会使用移动操作，否则会进行拷贝操作。这有助于确保异常安全性，以避免在构造元素时抛出异常时，不会破坏容器的状态。</p>
+<p>要使用 <code>std::move_if_noexcept</code>，您需要确保在需要优化移动操作的情况下，并且对于元素类型的移动构造函数声明了 <code>noexcept</code> 说明符。这通常是在实现自定义类时要考虑的事情。</p>
+<p>总之，<code>std::move_if_noexcept</code> 是一种有助于提高性能并确保异常安全性的工具，但需要在适当的情况下使用它。</p>
+<h3 id="局部对象可能适用于返回值优化"><a href="#局部对象可能适用于返回值优化" class="headerlink" title="局部对象可能适用于返回值优化"></a>局部对象可能适用于返回值优化</h3><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 复制版本</span></span></span><br><span class="line"><span class="function"> </span>&#123;</span><br><span class="line">    Widget w;           <span class="comment">// 局部变量</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> w;           <span class="comment">// 将w&quot;复制&quot;入返回值</span></span><br><span class="line"> &#125;</span><br><span class="line"><span class="comment">// 将&quot;复制&quot;转换为移动来进行优化？</span></span><br><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 移动版本</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Widget w;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> std::<span class="built_in">move</span>(w);   <span class="comment">//将w移入返回值，不能这样做！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>很不幸，这样是不正确的。因为先人就是这样规定的。开个玩笑，因为先人已经比我们领先很多年想到并且解决了这里的优化问题。也就是熟知的RVO(返回值优化)。</p>
+<p>编译器如果要在一个桉之返回的函数里忽略对局部对象的复制（或移动），需要满足两个条件：</p>
+<ol>
+<li>局部对象和返回值性别相同</li>
+<li>返回的就是局部对象本身</li>
+</ol>
+<p>我们现在往上看“复制版本”的函数，两个条件均满足，所以进行返回值优化，实质上该函数并没有复制任何东西。而移动版本的函数不满足第二个规定，返回的不是本身而是引用，并没有优化，编译器就把返回值<code>w</code>移入函数的返回值存储的位置。<code>RVO</code>的那条福音后面又接着说明,即使实施<code>RVO</code>的前提条件满足,但编译器选择不执行复制省略的时候,返回对象必须作为右值处理。这么一来,就等于标准要求:当<code>RVO</code>的前提条件允许时,要么发生复制省略,要么<code>std:: move</code>隐式地被实施于返回的局部对象上。因此，上面的例子中复制版本的函数就可能被编译器优化成移动的版本。</p>
+<p>既然如此，就不要使用<code>std::move</code>或者<code>std::forward</code>来对可能适用于优化的局部对象处理。防止排除编译器<code>RVO</code>的实施机会。</p>
+]]></content>
+      <tags>
+        <tag>c++</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>条款24:区分万能引用和右值引用</title>
     <url>/2023/10/12/%E6%9D%A1%E6%AC%BE24/</url>
     <content><![CDATA[<h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>不是所有的<code>&amp;&amp;</code>都是右值引用！</p>
@@ -1124,42 +1152,6 @@
 <h4 id="多说一点"><a href="#多说一点" class="headerlink" title="多说一点"></a>多说一点</h4><p>有些人不清楚<code>template&lt;class... Args&gt;</code>中的<code>...</code>是什么，其实很简单，”…” 是用来表示可变参数模板的语法。它用于表示函数或类模板可以接受可变数量的参数。具体来说，<code>Args</code> 是一个参数包，它可以包含零个或多个模板参数。<code>Args&amp;&amp;... args</code> 表示您可以将任意数量的参数传递给 <code>emplace_back</code> 函数，每个参数都会被表示为 <code>Args</code> 类型的右值引用。这种语法通常用于实现”完美转发”。（后面会提到）</p>
 <p>而前面提到的另一种场景,auto声明，在<code>C++11</code>中不怎么普遍。而在<code>C++14</code>中，它现身的机会就更多了，因为<code>C++14</code>中的<code>lambda</code>表达式中可以声明<code>auto&amp;&amp; </code>的形参。</p>
 <h3 id="万能引用的作用"><a href="#万能引用的作用" class="headerlink" title="万能引用的作用"></a>万能引用的作用</h3><p>这种引用在模板编程中非常有用，因为它们能够保持对传递给它们的参数的左值或右值性质，并且可以实现完美转发，使它们适用于各种不同类型的参数。</p>
-]]></content>
-      <tags>
-        <tag>c++</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>条款25:针对右值引用实施std::move，针对万能引用实施std::forward</title>
-    <url>/2023/10/12/%E6%9D%A1%E6%AC%BE25/</url>
-    <content><![CDATA[<h3 id="重载？"><a href="#重载？" class="headerlink" title="重载？"></a>重载？</h3><p>在条款23的基础上，再来细说一下<code>std::move</code>和<code>std::forward</code>。看这个例子：</p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::<span class="built_in">move</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>看着好像一切安好。<span id="more"></span>注意这里的<code>n</code>是局部变量，传递给<code>e.setName()</code>，调用者假定该函数对<code>n</code>只进行读操作是没有任何问题的。但是<code>setName()</code>内部使用了<code>std::move</code>将其引用的形参无条件强转成右值，因此<code>n</code>的数值就会被移入<code>e.name</code>。运行完<code>setName()</code>后，<code>n</code>就成了一个未知数。</p>
-<p>你会说：那我为啥要把形参声明称万能引用自讨苦吃，我直接为其分别重载左值和右值两个版本不就好了。你说的对，但是对的很难受。程序运行效率降低是其次，最主要的是代码难以维护以及扩展性太差。</p>
-<p>这个例子只有一个形参，还好处理，两个重载版本就行了。那么10个参数的呢？难不成你重载 (2^{10}) 个版本？有啥想不开的非要这么折磨自己。更别说有些函数模板会有无穷多个形参（比如：<code>std::make_shared</code>）</p>
-<h3 id="万能引用！"><a href="#万能引用！" class="headerlink" title="万能引用！"></a>万能引用！</h3><p>上面的例子修改如下，这样就不需要重载也能实现对应功能了：</p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::forward&lt;T&gt;(newName); <span class="comment">// 使用 std::forward 来保持左值或右值性质</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;NewName&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<h3 id="需要注意的点"><a href="#需要注意的点" class="headerlink" title="需要注意的点"></a>需要注意的点</h3><p>假设在某个函数中，你刚开始只用了一次该对<br>象，之后就对其实施<code>std::move</code>或者<code>std::forward</code>，这没有问题，需要注意的是，随着函数不断完善，如果在该函数中不止一次地绑定到右值引用或者万能引用，就会导致上面变量<code>n</code>就成了一个未知数的错误。因此，在这种情况下，只能在最后一次使用该引用的时候对其实施<code>std::move</code>或者<code>std::forward</code>来确保其他操作时候其值依旧存在。</p>
-<h3 id="std-move-if-noexcept"><a href="#std-move-if-noexcept" class="headerlink" title="std::move_if_noexcept"></a>std::move_if_noexcept</h3><p><code>std::move_if_noexcept</code> 通常用于优化移动操作，特别是在异常安全性方面。它可以帮助在一些情况下，当移动操作不会抛出异常时，避免不必要的拷贝。</p>
-<p>这个函数的典型用例是在容器类的 <code>emplace_back</code> 和 <code>emplace</code> 成员函数中，这些函数通常要求插入元素时提供的参数（构造元素的参数）不会抛出异常。这样可以确保在插入元素时，如果构造过程抛出异常，容器的状态不会受到破坏，因为元素的构造是在容器内完成的。</p>
-<p>考虑以下示例，使用 <code>std::move_if_noexcept</code> 在 <code>emplace_back</code> 中：</p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">std::vector&lt;MyType&gt; myVector;</span><br><span class="line">myVector.<span class="built_in">emplace_back</span>(std::<span class="built_in">move_if_noexcept</span>(someValue));</span><br></pre></td></tr></table></figure>
-
-<p>在这里，<code>std::move_if_noexcept</code> 会检查 <code>someValue</code> 是否可以进行无异常移动，如果可以，它会使用移动操作，否则会进行拷贝操作。这有助于确保异常安全性，以避免在构造元素时抛出异常时，不会破坏容器的状态。</p>
-<p>要使用 <code>std::move_if_noexcept</code>，您需要确保在需要优化移动操作的情况下，并且对于元素类型的移动构造函数声明了 <code>noexcept</code> 说明符。这通常是在实现自定义类时要考虑的事情。</p>
-<p>总之，<code>std::move_if_noexcept</code> 是一种有助于提高性能并确保异常安全性的工具，但需要在适当的情况下使用它。</p>
-<h3 id="局部对象可能适用于返回值优化"><a href="#局部对象可能适用于返回值优化" class="headerlink" title="局部对象可能适用于返回值优化"></a>局部对象可能适用于返回值优化</h3><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 复制版本</span></span></span><br><span class="line"><span class="function"> </span>&#123;</span><br><span class="line">    Widget w;           <span class="comment">// 局部变量</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> w;           <span class="comment">// 将w&quot;复制&quot;入返回值</span></span><br><span class="line"> &#125;</span><br><span class="line"><span class="comment">// 将&quot;复制&quot;转换为移动来进行优化？</span></span><br><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 移动版本</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Widget w;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> std::<span class="built_in">move</span>(w);   <span class="comment">//将w移入返回值，不能这样做！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>很不幸，这样是不正确的。因为先人就是这样规定的。开个玩笑，因为先人已经比我们领先很多年想到并且解决了这里的优化问题。也就是熟知的RVO(返回值优化)。</p>
-<p>编译器如果要在一个桉之返回的函数里忽略对局部对象的复制（或移动），需要满足两个条件：</p>
-<ol>
-<li>局部对象和返回值性别相同</li>
-<li>返回的就是局部对象本身</li>
-</ol>
-<p>我们现在往上看“复制版本”的函数，两个条件均满足，所以进行返回值优化，实质上该函数并没有复制任何东西。而移动版本的函数不满足第二个规定，返回的不是本身而是引用，并没有优化，编译器就把返回值<code>w</code>移入函数的返回值存储的位置。<code>RVO</code>的那条福音后面又接着说明,即使实施<code>RVO</code>的前提条件满足,但编译器选择不执行复制省略的时候,返回对象必须作为右值处理。这么一来,就等于标准要求:当<code>RVO</code>的前提条件允许时,要么发生复制省略,要么<code>std:: move</code>隐式地被实施于返回的局部对象上。因此，上面的例子中复制版本的函数就可能被编译器优化成移动的版本。</p>
-<p>既然如此，就不要使用<code>std::move</code>或者<code>std::forward</code>来对可能适用于优化的局部对象处理。防止排除编译器<code>RVO</code>的实施机会。</p>
 ]]></content>
       <tags>
         <tag>c++</tag>

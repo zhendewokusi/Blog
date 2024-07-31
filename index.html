@@ -198,7 +198,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -300,7 +300,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -387,7 +387,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -465,7 +465,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -488,70 +488,6 @@
 </ol>
 <h2 id="主体"><a href="#主体" class="headerlink" title="主体"></a>主体</h2><p> slabs_full 的所有对象都在使用中。 slabs_partial 中有空闲对象，因此是分配对象的主要候选者。 slabs_free 没有分配的对象，是slab 销毁的主要候选者。</p>
 <figure class="highlight c"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// The slab lists for all objects.</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">kmem_cache_node</span> &#123;</span></span><br><span class="line">	<span class="type">spinlock_t</span> list_lock;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLAB</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_partial</span>;</span>	<span class="comment">/* partial list first, better asm code */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_full</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_free</span>;</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> total_slabs;	<span class="comment">/* length of all slab lists */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_slabs;	<span class="comment">/* length of free slab list only */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_objects;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> free_limit;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> colour_next;	<span class="comment">/* Per-node cache coloring */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">array_cache</span> *<span class="title">shared</span>;</span>	<span class="comment">/* shared per node */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">alien_cache</span> **<span class="title">alien</span>;</span>	<span class="comment">/* on other nodes */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> next_reap;	<span class="comment">/* updated without locking */</span></span><br><span class="line">	<span class="type">int</span> free_touched;		<span class="comment">/* updated without locking */</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> nr_partial;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">partial</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB_DEBUG</span></span><br><span class="line">	<span class="type">atomic_long_t</span> nr_slabs;</span><br><span class="line">	<span class="type">atomic_long_t</span> total_objects;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">full</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/04/%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97%E6%B7%BB%E5%8A%A0/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2024/06/04/%E5%86%85%E6%A0%B8%E6%A8%A1%E5%9D%97%E6%B7%BB%E5%8A%A0/" class="post-title-link" itemprop="url">内核模块添加</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2024-06-04 18:07:34" itemprop="dateCreated datePublished" datetime="2024-06-04T18:07:34+08:00">2024-06-04</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          
       
     </div>
 
@@ -601,7 +537,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -753,7 +689,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -911,7 +847,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -987,7 +923,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -1060,7 +996,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-06-12 23:05:54" itemprop="dateModified" datetime="2024-06-12T23:05:54+08:00">2024-06-12</time>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
               </span>
 
           
@@ -1084,6 +1020,78 @@
 <p>然后在Makefile里面操作:</p>
 <p>我是在vscode中,Ctrl+F，将所有的<code>bochs</code>更改成<code>bochs_gdb</code>，接着将<code>bochs_gdb.h</code>更改为<code>bochs.h</code>,<code>wxbochs_gdb.rc</code>更改为<code>wxbochs.rc</code>，后面这个应该没影响，是和win有关系的，但是保险起见还是改了吧，然后进行<code>make -j16 &amp;&amp; sudo make install</code>。</p>
 
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/" class="post-title-link" itemprop="url">TCP 超时计时器的管理</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+
+              <time title="创建时间：2024-01-05 15:54:19" itemprop="dateCreated datePublished" datetime="2024-01-05T15:54:19+08:00">2024-01-05</time>
+            </span>
+              <span class="post-meta-item">
+                <span class="post-meta-item-icon">
+                  <i class="far fa-calendar-check"></i>
+                </span>
+                <span class="post-meta-item-text">更新于</span>
+                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+              </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a target="_blank" rel="noopener" href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
+          <!--noindex-->
+            <div class="post-button">
+              <a class="btn" href="/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/#more" rel="contents">
+                阅读全文 &raquo;
+              </a>
+            </div>
+          <!--/noindex-->
+        
       
     </div>
 
@@ -1169,7 +1177,7 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">24</span>
+          <span class="site-state-item-count">23</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
