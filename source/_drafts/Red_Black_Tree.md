@@ -608,7 +608,7 @@ struct rb_node *rb_prev(struct rb_node *node)
 		return node;
 	}
 
-	while (node->rb_parent && node == node->rb_parent->rb_left)
+	while (node->rb_parent && node == node->rb_parent->rb_left) 
 		node = node->rb_parent;
 
 	return node->rb_parent;
