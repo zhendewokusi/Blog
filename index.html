@@ -167,6 +167,84 @@
   
   
   <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
+    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/10/19/ArchLinux-%E6%89%AC%E5%A3%B0%E5%99%A8%E4%B8%8D%E5%AD%98%E5%9C%A8%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/">
+
+    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
+      <meta itemprop="image" content="/images/avatar.gif">
+      <meta itemprop="name" content="zhendewokusi">
+      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
+    </span>
+
+    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
+      <meta itemprop="name" content="元芳你怎么看">
+    </span>
+      <header class="post-header">
+        <h2 class="post-title" itemprop="name headline">
+          
+            <a href="/2024/10/19/ArchLinux-%E6%89%AC%E5%A3%B0%E5%99%A8%E4%B8%8D%E5%AD%98%E5%9C%A8%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/" class="post-title-link" itemprop="url">ArchLinux 扬声器不存在解决方案</a>
+        </h2>
+
+        <div class="post-meta">
+            <span class="post-meta-item">
+              <span class="post-meta-item-icon">
+                <i class="far fa-calendar"></i>
+              </span>
+              <span class="post-meta-item-text">发表于</span>
+              
+
+              <time title="创建时间：2024-10-19 20:52:21 / 修改时间：21:21:22" itemprop="dateCreated datePublished" datetime="2024-10-19T20:52:21+08:00">2024-10-19</time>
+            </span>
+
+          
+
+        </div>
+      </header>
+
+    
+    
+    
+    <div class="post-body" itemprop="articleBody">
+
+      
+          <h2 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h2><p>本机环境：<br>    OS: Arch Linux x86_64<br>    声卡：C-Media_R__Audio</p>
+<p>这几天面试，发现电脑能正常输入音频数据（麦克风），但是无法接收音频数据（扬声器）。<br>具体问题是：</p>
+<ol>
+<li><code>pavucontrol</code>命令打开的界面，<code>输出设备</code>中只有一个 HDMI 的输出（笔记本外接显示器）。</li>
+<li><code>alsamixer</code>进入后按<code>F6</code>查看有<code>HDA NVidia</code>和<code>C-Media(R) Audio</code>两个声卡，且重新选择后<code>pavucontrol</code>依旧只有一个 HDMI 的输出。电脑无法进行音量输出。</li>
+<li>排除硬件故障，在Windows中能正常工作。</li>
+</ol>
+<h2 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h2><p>安装 pulseaudio 以及 pulseaudio-alsa，或者安装 pipewire-pulse、pipewire-alsa、wireplumber。二选一，都装会有冲突。我本机是使用的 pulseaudio。</p>
+<p>使用<code>aplay -l</code>命令查看自己有几个声卡，这一步输出后续会用到：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">➜  ~ aplay -l</span><br><span class="line">**** List of PLAYBACK Hardware Devices ****</span><br><span class="line">card 0: NVidia [HDA NVidia], device 3: HDMI 0 [27M1C5500V]</span><br><span class="line">  Subdevices: 1/1</span><br><span class="line">  Subdevice <span class="comment">#0: subdevice #0</span></span><br><span class="line">card 0: NVidia [HDA NVidia], device 7: HDMI 1 [HDMI 1]</span><br><span class="line">  Subdevices: 1/1</span><br><span class="line">  Subdevice <span class="comment">#0: subdevice #0</span></span><br><span class="line">card 1: Audio [C-Media(R) Audio], device 0: USB Audio [USB Audio]</span><br><span class="line">  Subdevices: 1/1</span><br><span class="line">  Subdevice <span class="comment">#0: subdevice #0</span></span><br></pre></td></tr></table></figure>
+
+<p>修改前先列出系统中所有可用的音频输出设备（sinks）。</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">pactl list short sinks</span><br><span class="line"><span class="comment"># 此时没有 C-Media Audio 的输出设备</span></span><br><span class="line"><span class="comment"># 1	alsa_output.pci-0000_01_00.1.hdmi-stereo        module-alsa-card.c      s16le 2ch 44100Hz       IDLE</span></span><br></pre></td></tr></table></figure>
+
+<p>之后重新加载相关模块后再查看可用音频输出设备</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">pactl unload-module module-udev-detect</span><br><span class="line">pactl load-module module-udev-detect</span><br><span class="line">pactl list short sinks</span><br><span class="line">1       alsa_output.hw_1_0      module-alsa-sink.c      s16le 2ch 44100Hz       IDLE</span><br><span class="line">2       alsa_output.pci-0000_01_00.1.hdmi-stereo        module-alsa-card.c      s16le 2ch 44100Hz       IDLE</span><br></pre></td></tr></table></figure>
+<p>此时在<code>pavucontrol</code>中应该也能查看到网卡设备，选择输出就行，问题基本上就解决了，应该是模块加载顺序可能有问题，导致某些设备没有被正常检测到，重新加载一下就好了。唯一的问题是每次开机都要重新加载模块，这比较麻烦，此时就需要修改相关配置文件：</p>
+<figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">sudo vim /etc/pulse/default.pa</span><br><span class="line"></span><br><span class="line"><span class="comment"># 如果有，将这一行前面的注释去除</span></span><br><span class="line">load-module module-udev-detect</span><br><span class="line"></span><br><span class="line"><span class="comment"># 最后在该文件末尾添加（1,0 含义是前面 aplay -l 输出的信息， card &quot;1&quot;, device &quot;0&quot;, PCI设备管理相关的，知道怎么改自己的就够了）</span></span><br><span class="line">load-module module-alsa-sink device=hw:1,0</span><br></pre></td></tr></table></figure>
+
+<p>重启查看是否能检测到扬声器。</p>
+
+      
+    </div>
+
+    
+    
+    
+      <footer class="post-footer">
+        <div class="post-eof"></div>
+      </footer>
+  </article>
+  
+  
+  
+
+      
+  
+  
+  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
     <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/06/09/DPDK-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE/">
 
     <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
@@ -198,7 +276,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -300,7 +378,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -387,7 +465,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -465,7 +543,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -537,7 +615,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -689,7 +767,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -847,7 +925,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -923,7 +1001,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -996,7 +1074,7 @@
                   <i class="far fa-calendar-check"></i>
                 </span>
                 <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
+                <time title="修改时间：2024-10-19 21:21:22" itemprop="dateModified" datetime="2024-10-19T21:21:22+08:00">2024-10-19</time>
               </span>
 
           
@@ -1020,78 +1098,6 @@
 <p>然后在Makefile里面操作:</p>
 <p>我是在vscode中,Ctrl+F，将所有的<code>bochs</code>更改成<code>bochs_gdb</code>，接着将<code>bochs_gdb.h</code>更改为<code>bochs.h</code>,<code>wxbochs_gdb.rc</code>更改为<code>wxbochs.rc</code>，后面这个应该没影响，是和win有关系的，但是保险起见还是改了吧，然后进行<code>make -j16 &amp;&amp; sudo make install</code>。</p>
 
-      
-    </div>
-
-    
-    
-    
-      <footer class="post-footer">
-        <div class="post-eof"></div>
-      </footer>
-  </article>
-  
-  
-  
-
-      
-  
-  
-  <article itemscope itemtype="http://schema.org/Article" class="post-block" lang="zh-CN">
-    <link itemprop="mainEntityOfPage" href="http://zhendewokusi.github.io/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/">
-
-    <span hidden itemprop="author" itemscope itemtype="http://schema.org/Person">
-      <meta itemprop="image" content="/images/avatar.gif">
-      <meta itemprop="name" content="zhendewokusi">
-      <meta itemprop="description" content="琼楼挂月钓流云，梦里瑶台暂借春">
-    </span>
-
-    <span hidden itemprop="publisher" itemscope itemtype="http://schema.org/Organization">
-      <meta itemprop="name" content="元芳你怎么看">
-    </span>
-      <header class="post-header">
-        <h2 class="post-title" itemprop="name headline">
-          
-            <a href="/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/" class="post-title-link" itemprop="url">TCP 超时计时器的管理</a>
-        </h2>
-
-        <div class="post-meta">
-            <span class="post-meta-item">
-              <span class="post-meta-item-icon">
-                <i class="far fa-calendar"></i>
-              </span>
-              <span class="post-meta-item-text">发表于</span>
-
-              <time title="创建时间：2024-01-05 15:54:19" itemprop="dateCreated datePublished" datetime="2024-01-05T15:54:19+08:00">2024-01-05</time>
-            </span>
-              <span class="post-meta-item">
-                <span class="post-meta-item-icon">
-                  <i class="far fa-calendar-check"></i>
-                </span>
-                <span class="post-meta-item-text">更新于</span>
-                <time title="修改时间：2024-07-31 19:20:03" itemprop="dateModified" datetime="2024-07-31T19:20:03+08:00">2024-07-31</time>
-              </span>
-
-          
-
-        </div>
-      </header>
-
-    
-    
-    
-    <div class="post-body" itemprop="articleBody">
-
-      
-          <h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a target="_blank" rel="noopener" href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
-          <!--noindex-->
-            <div class="post-button">
-              <a class="btn" href="/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/#more" rel="contents">
-                阅读全文 &raquo;
-              </a>
-            </div>
-          <!--/noindex-->
-        
       
     </div>
 
@@ -1177,14 +1183,14 @@
       <div class="site-state-item site-state-posts">
           <a href="/archives/">
         
-          <span class="site-state-item-count">23</span>
+          <span class="site-state-item-count">24</span>
           <span class="site-state-item-name">日志</span>
         </a>
       </div>
       <div class="site-state-item site-state-tags">
             <a href="/tags/">
           
-        <span class="site-state-item-count">11</span>
+        <span class="site-state-item-count">12</span>
         <span class="site-state-item-name">标签</span></a>
       </div>
   </nav>

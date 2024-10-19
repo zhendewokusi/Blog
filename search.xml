@@ -1,6 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>ArchLinux 扬声器不存在解决方案</title>
+    <url>/2024/10/19/ArchLinux-%E6%89%AC%E5%A3%B0%E5%99%A8%E4%B8%8D%E5%AD%98%E5%9C%A8%E8%A7%A3%E5%86%B3%E6%96%B9%E6%A1%88/</url>
+    <content><![CDATA[<h2 id="问题"><a href="#问题" class="headerlink" title="问题"></a>问题</h2><p>本机环境：<br>    OS: Arch Linux x86_64<br>    声卡：C-Media_R__Audio</p>
+<p>这几天面试，发现电脑能正常输入音频数据（麦克风），但是无法接收音频数据（扬声器）。<br>具体问题是：</p>
+<ol>
+<li><code>pavucontrol</code>命令打开的界面，<code>输出设备</code>中只有一个 HDMI 的输出（笔记本外接显示器）。</li>
+<li><code>alsamixer</code>进入后按<code>F6</code>查看有<code>HDA NVidia</code>和<code>C-Media(R) Audio</code>两个声卡，且重新选择后<code>pavucontrol</code>依旧只有一个 HDMI 的输出。电脑无法进行音量输出。</li>
+<li>排除硬件故障，在Windows中能正常工作。</li>
+</ol>
+<h2 id="解决方案"><a href="#解决方案" class="headerlink" title="解决方案"></a>解决方案</h2><p>安装 pulseaudio 以及 pulseaudio-alsa，或者安装 pipewire-pulse、pipewire-alsa、wireplumber。二选一，都装会有冲突。我本机是使用的 pulseaudio。</p>
+<p>使用<code>aplay -l</code>命令查看自己有几个声卡，这一步输出后续会用到：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">➜  ~ aplay -l</span><br><span class="line">**** List of PLAYBACK Hardware Devices ****</span><br><span class="line">card 0: NVidia [HDA NVidia], device 3: HDMI 0 [27M1C5500V]</span><br><span class="line">  Subdevices: 1/1</span><br><span class="line">  Subdevice <span class="comment">#0: subdevice #0</span></span><br><span class="line">card 0: NVidia [HDA NVidia], device 7: HDMI 1 [HDMI 1]</span><br><span class="line">  Subdevices: 1/1</span><br><span class="line">  Subdevice <span class="comment">#0: subdevice #0</span></span><br><span class="line">card 1: Audio [C-Media(R) Audio], device 0: USB Audio [USB Audio]</span><br><span class="line">  Subdevices: 1/1</span><br><span class="line">  Subdevice <span class="comment">#0: subdevice #0</span></span><br></pre></td></tr></table></figure>
+
+<p>修改前先列出系统中所有可用的音频输出设备（sinks）。</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">pactl list short sinks</span><br><span class="line"><span class="comment"># 此时没有 C-Media Audio 的输出设备</span></span><br><span class="line"><span class="comment"># 1	alsa_output.pci-0000_01_00.1.hdmi-stereo        module-alsa-card.c      s16le 2ch 44100Hz       IDLE</span></span><br></pre></td></tr></table></figure>
+
+<p>之后重新加载相关模块后再查看可用音频输出设备</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">pactl unload-module module-udev-detect</span><br><span class="line">pactl load-module module-udev-detect</span><br><span class="line">pactl list short sinks</span><br><span class="line">1       alsa_output.hw_1_0      module-alsa-sink.c      s16le 2ch 44100Hz       IDLE</span><br><span class="line">2       alsa_output.pci-0000_01_00.1.hdmi-stereo        module-alsa-card.c      s16le 2ch 44100Hz       IDLE</span><br></pre></td></tr></table></figure>
+<p>此时在<code>pavucontrol</code>中应该也能查看到网卡设备，选择输出就行，问题基本上就解决了，应该是模块加载顺序可能有问题，导致某些设备没有被正常检测到，重新加载一下就好了。唯一的问题是每次开机都要重新加载模块，这比较麻烦，此时就需要修改相关配置文件：</p>
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">sudo vim /etc/pulse/default.pa</span><br><span class="line"></span><br><span class="line"><span class="comment"># 如果有，将这一行前面的注释去除</span></span><br><span class="line">load-module module-udev-detect</span><br><span class="line"></span><br><span class="line"><span class="comment"># 最后在该文件末尾添加（1,0 含义是前面 aplay -l 输出的信息， card &quot;1&quot;, device &quot;0&quot;, PCI设备管理相关的，知道怎么改自己的就够了）</span></span><br><span class="line">load-module module-alsa-sink device=hw:1,0</span><br></pre></td></tr></table></figure>
+
+<p>重启查看是否能检测到扬声器。</p>
+]]></content>
+      <tags>
+        <tag>ArchLinux</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>DPDK 环境配置</title>
     <url>/2024/06/09/DPDK-%E7%8E%AF%E5%A2%83%E9%85%8D%E7%BD%AE/</url>
     <content><![CDATA[<h1 id="环境配置"><a href="#环境配置" class="headerlink" title="环境配置"></a>环境配置</h1><h3 id="DPDK系统要求："><a href="#DPDK系统要求：" class="headerlink" title="DPDK系统要求："></a>DPDK系统要求：</h3><p>Kernel version &gt;&#x3D; 4.14<br>GCC（版本 5.0+）或 Clang（版本 3.6+）<br>Python 3.6 或更高版本<br>Meson (version 0.53.2+) and ninja<br>pyelftools （版本 0.22+）</p>
@@ -134,6 +162,58 @@
 ]]></content>
       <tags>
         <tag>真相还原</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>TCP 超时计时器的管理</title>
+    <url>/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
+<span id="more"></span>
+
+<h2 id="每连接单一计时器"><a href="#每连接单一计时器" class="headerlink" title="每连接单一计时器"></a>每连接单一计时器</h2><p>我们都能想到，如果给每一个<code>TCP</code>分段都分配一个计时器，这是最直接的方法。但是这带来了巨大的内存开销和调度开销。难不成一个<code>TCP</code>通信的服务器负担全用来给分段计时间，这太离谱了，有没有更好的办法，先人已经为我们想到了一个适用至今的方法：采取每个TCP连接单一计时器的设计。</p>
+<p>首先我们要明确，这个超时计时器需要实现什么功能：</p>
+<ol>
+<li>有报文<strong>长时间</strong>没有接收到，必须提示超时。</li>
+<li>这个<strong>长时间</strong>不能太长也不能太短。</li>
+</ol>
+<p>如果这里的超时时间太短了，会导致正常传输的数据包被当成无效数据，网络中充斥大量无效重传，浪费网络资源；如果超时时间太长，就会导致数据传输效率的太低，网络延迟提高。</p>
+<p>因此RFC2988制定了下面的原则：</p>
+<ol>
+<li>每次发送包含数据的数据包（包括重传）时，如果定时器没有运行，则启动定时器。如果定时器在运行，就什么也不做。</li>
+<li>当所有未完成的数据都被确认后，关闭定时器。</li>
+<li>当接收到新数据的ACK时候，重新启动定时器。<br>当定时器超时时，执行下面的操作：</li>
+<li>指数退避，发送方设置 RTO 为之前的二倍，并且关闭定时器。</li>
+<li>重传 TCP 接收方尚未确认的最早的报文段。</li>
+<li>启动重传定时器。</li>
+</ol>
+<p>为什么要有原则 3 ？</p>
+<p>假设下面的情况，如果在定时器快到期的时候发送一部分数据。这样在超时前，只能收到定时器刚开始运行时发送的报文段，后续的正常数据包会被当作超时，因此后续的数据都需要重传，这太考验网络的负载和使用者的耐心了。有了原则3，好处自然不用我多说，保证一部分正常数据的不必要重传。</p>
+<p>还有就是如果一个ack到来了，说明后续的ack大概率也会到达，即使出现了丢失，也会在两倍的 RTO 内被重传。为什么是两倍呢？举个简单的例子，A和B是两个同时发送的报文段的ACK（假设，一般会将其合并成一个ACK进行发送），发送方在无限接近超时时候收到了A,此时会将定时器重新启动，如果B数据包在网络中丢失，那么发送方再等待一个 RTO 就会知道 B 丢失。这样算下来不就是两倍的 RTO 内会被重传嘛。</p>
+<h2 id="RTO的计算"><a href="#RTO的计算" class="headerlink" title="RTO的计算"></a>RTO的计算</h2><p>为了计算RTO,TCP的发送方需要维护两个变量：SRTT(平滑往返时间，英文：Smoothed Round-Trip Time)和RTTAR（往返时间变化，英文：Returns the Round Trip Time Variance）。</p>
+<p>SRTT、RTTAVR和RTO的计算规则如下：</p>
+<ol>
+<li>测量RTT之前，需要将RTO设置为3秒，此时指数退避依旧有效。<br> 该计时器实际上会产生2.5秒到3秒的数值。因为使用粒度为G的心跳计时器的实现不应该将计时器设置低于<code>2.5 + G</code>秒。</li>
+<li>当进行第一个 RTT 测量时候，主机必须如下设置:<ul>
+<li>SRTT &lt;- R</li>
+<li>RTTVAR &lt;- R&#x2F;2</li>
+<li>RTO &lt;- SRTT + max(G,K * RTTVAR) 这里的K为4</li>
+</ul>
+</li>
+<li>当进行了一个后续的往返时间测量 R’ 时，主机必须设置：<ul>
+<li>RTTVAR &lt;- (1 - beta) * RTTVAR + beta * | SRTT - R’|</li>
+<li>SRTT &lt;- (1 - alpha) * SRTT + alpha * R’<br>这里的alpha为1&#x2F;8，beta &#x3D; 1&#x2F;4。（2988里面说是 JK88 建议的，应该是个1988年的论文吧，没找到）。<br>这里需要注意的是，计算RTTVAR时用到的SRTT，必须是分配前的数值，也就是说，这两个计算的顺序不能改变。<br>计算 RTO 时候，如果其小于 1 秒，上取整。RTO可以设置最大值，但是最大值应该大于60秒。</li>
+</ul>
+</li>
+</ol>
+<h2 id="获取-RTT-的样本"><a href="#获取-RTT-的样本" class="headerlink" title="获取 RTT 的样本"></a>获取 RTT 的样本</h2><p>TCP<strong>必须</strong>使用<a href="https://www.geeksforgeeks.org/karns-algorithm-for-optimizing-tcp/">Karn-Partridge 算法</a>来获取准确的消息往返时间估计。由于重传的模糊性，举个简单的例子，如果一个报文段发送了一次重传，发送方接受到ACK，但是此时的ACK到底是重传报文段的确认还是第一次发送的报文段的确认，这就是重传的模糊性，发送方不知道到底是哪个报文段的确认，这样得到的RTT会有很大的偏差，当然这个问题可以由TCP的时间戳选项来解决。该算法会忽略重传的数据段。仅使用明确的确认（即仅传送一次的段的确认）来估计往返时间。Karn 算法的第一部分规定，当存在重传模糊性时，RTT 值将被忽略，而不是集成到 SRTT 中。</p>
+<p>但是也有问题，这么简单粗暴的方法，举个例子，如果TCP延迟显著增加后发送数据，TCP计算超时，并且根据之前的RTT来重新传输数据，极端情况下，TCP忽略所有的重传数据包的RTT,RTO永远不会更新。</p>
+<p>其第二部分就是考虑到了这种不太理想的网络情况。为每次重传的RTO设置“退避因子”，也就是常说的指数退避。在不需要重传的成功数据传输发生之前，不会重置退避因子。该部分会放置网络的拥塞，使其能从任何拥塞问题中恢复，还保证了RTT信息不会丢失，当数据成功传输而无需重传时，可以将伴随的RTT测量添加到SRTT中。</p>
+<p>目前很多TCP实现了时间戳，这样就方便多了，发送端再也不需要保存发送分段的时间了，只需要将其放入协议头的时间戳字段，然后接收端将其回显在ACK即可，然后发送端收到ACK后，取出时间戳，和当前时间做算术差，即可完成一次RTT的测量。</p>
+<p>需要注意的是：TCP 实现可以在多次回退计时器后清除 SRTT 和 RTTVAR，因为在这种情况下当前 SRTT 和 RTTVAR 很可能是假的。一旦 SRTT 和 RTTVAR 被清除，它们应该采集的下一个 RTT 样本进行初始化（RTO的第二步）。</p>
+<p>…..</p>
+]]></content>
+      <tags>
+        <tag>TCP</tag>
       </tags>
   </entry>
   <entry>
@@ -302,58 +382,6 @@
       </tags>
   </entry>
   <entry>
-    <title>TCP 超时计时器的管理</title>
-    <url>/2024/01/05/TCP-%E8%B6%85%E6%97%B6%E8%AE%A1%E6%97%B6%E5%99%A8%E7%9A%84%E7%AE%A1%E7%90%86/</url>
-    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文只是一个简要的笔记，如果想要深入了解，请查阅<a href="https://www.rfc-editor.org/info/rfc2988">RFC 2988</a>。适合对<code>TCP</code>有一定了解和基础的人查看。</p>
-<span id="more"></span>
-
-<h2 id="每连接单一计时器"><a href="#每连接单一计时器" class="headerlink" title="每连接单一计时器"></a>每连接单一计时器</h2><p>我们都能想到，如果给每一个<code>TCP</code>分段都分配一个计时器，这是最直接的方法。但是这带来了巨大的内存开销和调度开销。难不成一个<code>TCP</code>通信的服务器负担全用来给分段计时间，这太离谱了，有没有更好的办法，先人已经为我们想到了一个适用至今的方法：采取每个TCP连接单一计时器的设计。</p>
-<p>首先我们要明确，这个超时计时器需要实现什么功能：</p>
-<ol>
-<li>有报文<strong>长时间</strong>没有接收到，必须提示超时。</li>
-<li>这个<strong>长时间</strong>不能太长也不能太短。</li>
-</ol>
-<p>如果这里的超时时间太短了，会导致正常传输的数据包被当成无效数据，网络中充斥大量无效重传，浪费网络资源；如果超时时间太长，就会导致数据传输效率的太低，网络延迟提高。</p>
-<p>因此RFC2988制定了下面的原则：</p>
-<ol>
-<li>每次发送包含数据的数据包（包括重传）时，如果定时器没有运行，则启动定时器。如果定时器在运行，就什么也不做。</li>
-<li>当所有未完成的数据都被确认后，关闭定时器。</li>
-<li>当接收到新数据的ACK时候，重新启动定时器。<br>当定时器超时时，执行下面的操作：</li>
-<li>指数退避，发送方设置 RTO 为之前的二倍，并且关闭定时器。</li>
-<li>重传 TCP 接收方尚未确认的最早的报文段。</li>
-<li>启动重传定时器。</li>
-</ol>
-<p>为什么要有原则 3 ？</p>
-<p>假设下面的情况，如果在定时器快到期的时候发送一部分数据。这样在超时前，只能收到定时器刚开始运行时发送的报文段，后续的正常数据包会被当作超时，因此后续的数据都需要重传，这太考验网络的负载和使用者的耐心了。有了原则3，好处自然不用我多说，保证一部分正常数据的不必要重传。</p>
-<p>还有就是如果一个ack到来了，说明后续的ack大概率也会到达，即使出现了丢失，也会在两倍的 RTO 内被重传。为什么是两倍呢？举个简单的例子，A和B是两个同时发送的报文段的ACK（假设，一般会将其合并成一个ACK进行发送），发送方在无限接近超时时候收到了A,此时会将定时器重新启动，如果B数据包在网络中丢失，那么发送方再等待一个 RTO 就会知道 B 丢失。这样算下来不就是两倍的 RTO 内会被重传嘛。</p>
-<h2 id="RTO的计算"><a href="#RTO的计算" class="headerlink" title="RTO的计算"></a>RTO的计算</h2><p>为了计算RTO,TCP的发送方需要维护两个变量：SRTT(平滑往返时间，英文：Smoothed Round-Trip Time)和RTTAR（往返时间变化，英文：Returns the Round Trip Time Variance）。</p>
-<p>SRTT、RTTAVR和RTO的计算规则如下：</p>
-<ol>
-<li>测量RTT之前，需要将RTO设置为3秒，此时指数退避依旧有效。<br> 该计时器实际上会产生2.5秒到3秒的数值。因为使用粒度为G的心跳计时器的实现不应该将计时器设置低于<code>2.5 + G</code>秒。</li>
-<li>当进行第一个 RTT 测量时候，主机必须如下设置:<ul>
-<li>SRTT &lt;- R</li>
-<li>RTTVAR &lt;- R&#x2F;2</li>
-<li>RTO &lt;- SRTT + max(G,K * RTTVAR) 这里的K为4</li>
-</ul>
-</li>
-<li>当进行了一个后续的往返时间测量 R’ 时，主机必须设置：<ul>
-<li>RTTVAR &lt;- (1 - beta) * RTTVAR + beta * | SRTT - R’|</li>
-<li>SRTT &lt;- (1 - alpha) * SRTT + alpha * R’<br>这里的alpha为1&#x2F;8，beta &#x3D; 1&#x2F;4。（2988里面说是 JK88 建议的，应该是个1988年的论文吧，没找到）。<br>这里需要注意的是，计算RTTVAR时用到的SRTT，必须是分配前的数值，也就是说，这两个计算的顺序不能改变。<br>计算 RTO 时候，如果其小于 1 秒，上取整。RTO可以设置最大值，但是最大值应该大于60秒。</li>
-</ul>
-</li>
-</ol>
-<h2 id="获取-RTT-的样本"><a href="#获取-RTT-的样本" class="headerlink" title="获取 RTT 的样本"></a>获取 RTT 的样本</h2><p>TCP<strong>必须</strong>使用<a href="https://www.geeksforgeeks.org/karns-algorithm-for-optimizing-tcp/">Karn-Partridge 算法</a>来获取准确的消息往返时间估计。由于重传的模糊性，举个简单的例子，如果一个报文段发送了一次重传，发送方接受到ACK，但是此时的ACK到底是重传报文段的确认还是第一次发送的报文段的确认，这就是重传的模糊性，发送方不知道到底是哪个报文段的确认，这样得到的RTT会有很大的偏差，当然这个问题可以由TCP的时间戳选项来解决。该算法会忽略重传的数据段。仅使用明确的确认（即仅传送一次的段的确认）来估计往返时间。Karn 算法的第一部分规定，当存在重传模糊性时，RTT 值将被忽略，而不是集成到 SRTT 中。</p>
-<p>但是也有问题，这么简单粗暴的方法，举个例子，如果TCP延迟显著增加后发送数据，TCP计算超时，并且根据之前的RTT来重新传输数据，极端情况下，TCP忽略所有的重传数据包的RTT,RTO永远不会更新。</p>
-<p>其第二部分就是考虑到了这种不太理想的网络情况。为每次重传的RTO设置“退避因子”，也就是常说的指数退避。在不需要重传的成功数据传输发生之前，不会重置退避因子。该部分会放置网络的拥塞，使其能从任何拥塞问题中恢复，还保证了RTT信息不会丢失，当数据成功传输而无需重传时，可以将伴随的RTT测量添加到SRTT中。</p>
-<p>目前很多TCP实现了时间戳，这样就方便多了，发送端再也不需要保存发送分段的时间了，只需要将其放入协议头的时间戳字段，然后接收端将其回显在ACK即可，然后发送端收到ACK后，取出时间戳，和当前时间做算术差，即可完成一次RTT的测量。</p>
-<p>需要注意的是：TCP 实现可以在多次回退计时器后清除 SRTT 和 RTTVAR，因为在这种情况下当前 SRTT 和 RTTVAR 很可能是假的。一旦 SRTT 和 RTTVAR 被清除，它们应该采集的下一个 RTT 样本进行初始化（RTO的第二步）。</p>
-<p>…..</p>
-]]></content>
-      <tags>
-        <tag>TCP</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>bochs安装教程</title>
     <url>/2024/01/17/bochs%E5%AE%89%E8%A3%85%E6%95%99%E7%A8%8B/</url>
     <content><![CDATA[<figure class="highlight shell"><table><tr><td class="code"><pre><span class="line">CONFIGURE_ARGS=&quot;--enable-gdb-stub&quot;</span><br><span class="line">CONFIGURE_ARGS=&quot;--enable-debugger --enable-readline&quot;</span><br></pre></td></tr></table></figure>
@@ -457,22 +485,6 @@
       </tags>
   </entry>
   <entry>
-    <title>slab 分配器</title>
-    <url>/2024/06/04/slab-%E5%88%86%E9%85%8D%E5%99%A8/</url>
-    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文是阅读 kernel 文档中关于 Slab 分配器的文档所写的笔记。</p>
-<p>slab分配器背后的基本思想：让常用对象的缓存保持在初始化状态供给内核使用。</p>
-<h2 id="slab-分配器的三个主要目标"><a href="#slab-分配器的三个主要目标" class="headerlink" title="slab 分配器的三个主要目标"></a>slab 分配器的三个主要目标</h2><ol>
-<li>分配小内存块有助于消除由伙伴系统引起的内部碎片。slab内部维护了两组小内存缓冲区的缓存，范围从32字节到131072（2的17次方）字节。</li>
-<li>缓存常用的对象，使系统不会浪费时间分配、初始化和销毁对象。当创建一个新的slab时，将很多对象进行打包并且进行初始化；当对象被释放，它保持其初始化状态，以便于下一次的对象分配。</li>
-<li>通过将对象与L1与L2缓存对齐，更好利用硬件缓存。这是slab的最本质的任务，如果一个对象打包进slab后还有剩余空间，slab就将其进行着色，使其与CPU L1缓存对齐。</li>
-</ol>
-<h2 id="主体"><a href="#主体" class="headerlink" title="主体"></a>主体</h2><p> slabs_full 的所有对象都在使用中。 slabs_partial 中有空闲对象，因此是分配对象的主要候选者。 slabs_free 没有分配的对象，是slab 销毁的主要候选者。</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// The slab lists for all objects.</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">kmem_cache_node</span> &#123;</span></span><br><span class="line">	<span class="type">spinlock_t</span> list_lock;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLAB</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_partial</span>;</span>	<span class="comment">/* partial list first, better asm code */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_full</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_free</span>;</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> total_slabs;	<span class="comment">/* length of all slab lists */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_slabs;	<span class="comment">/* length of free slab list only */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_objects;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> free_limit;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> colour_next;	<span class="comment">/* Per-node cache coloring */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">array_cache</span> *<span class="title">shared</span>;</span>	<span class="comment">/* shared per node */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">alien_cache</span> **<span class="title">alien</span>;</span>	<span class="comment">/* on other nodes */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> next_reap;	<span class="comment">/* updated without locking */</span></span><br><span class="line">	<span class="type">int</span> free_touched;		<span class="comment">/* updated without locking */</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> nr_partial;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">partial</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB_DEBUG</span></span><br><span class="line">	<span class="type">atomic_long_t</span> nr_slabs;</span><br><span class="line">	<span class="type">atomic_long_t</span> total_objects;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">full</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>]]></content>
-      <tags>
-        <tag>内核</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>中位数贪心</title>
     <url>/2023/12/18/%E4%B8%AD%E4%BD%8D%E6%95%B0%E8%B4%AA%E5%BF%83/</url>
     <content><![CDATA[<p>今天刷力扣第376周赛，后三道题全是<code>中位数贪心</code>，之前从来没做过这种类型的题目，记录一下学习博客。<br>这里推荐<a href="https://www.bilibili.com/video/BV1994y1A7oo/?spm_id_from=333.337.search-card.all.click">灵神</a>的视频讲解。</p>
@@ -490,6 +502,22 @@
 <figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="built_in">vector</span>&lt;<span class="type">int</span>&gt; palin;</span><br><span class="line"><span class="keyword">auto</span> init = [] &#123;</span><br><span class="line">    <span class="keyword">for</span>(<span class="type">int</span> base = <span class="number">1</span>;base &lt;= <span class="number">10000</span>;base*=<span class="number">10</span>) &#123;</span><br><span class="line">        <span class="comment">// 奇数</span></span><br><span class="line">        <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">            <span class="type">int</span> num = i;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> m = i / <span class="number">10</span>;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            palin.push_back(num);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="comment">// 偶数</span></span><br><span class="line">       <span class="keyword">if</span>(base &lt;= <span class="number">1000</span>)&#123;</span><br><span class="line">            <span class="keyword">for</span>(<span class="type">int</span> i = base;i &lt; base * <span class="number">10</span>;i++) &#123;</span><br><span class="line">                <span class="type">int</span> num = i;</span><br><span class="line">                <span class="keyword">for</span>(<span class="type">int</span> m = i;m;m /= <span class="number">10</span>) &#123;</span><br><span class="line">                    num = num * <span class="number">10</span> + m % <span class="number">10</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                palin.push_back(num);</span><br><span class="line">            &#125;</span><br><span class="line">       &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    palin.push_back(<span class="number">1&#x27;000&#x27;000&#x27;001</span>);</span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;();</span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">Solution</span> &#123;</span></span><br><span class="line">public:</span><br><span class="line">    <span class="type">long</span> <span class="type">long</span> <span class="title function_">minimumCost</span><span class="params">(<span class="built_in">vector</span>&lt;<span class="type">int</span>&gt;&amp; nums)</span> &#123;</span><br><span class="line">        sort(nums.begin(),nums.end());</span><br><span class="line">        <span class="type">int</span> n = nums.size();</span><br><span class="line">        </span><br><span class="line">        <span class="keyword">auto</span> distance = [&amp;](<span class="type">int</span> i) -&gt; <span class="type">long</span> <span class="type">long</span> &#123;</span><br><span class="line">            <span class="type">long</span> <span class="type">long</span> sum = <span class="number">0</span>;</span><br><span class="line">            <span class="type">int</span> target = palin[i];</span><br><span class="line">            <span class="keyword">for</span>(<span class="keyword">auto</span>&amp; e : nums) &#123;</span><br><span class="line">                sum += <span class="built_in">abs</span>(e - target);</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="keyword">return</span> sum;</span><br><span class="line">        &#125;;</span><br><span class="line"></span><br><span class="line">        <span class="type">int</span> i = lower_bound(palin.begin(),palin.end(),nums[(n<span class="number">-1</span>)/<span class="number">2</span>]) - palin.begin();</span><br><span class="line">        <span class="keyword">if</span>(palin[i] &lt;= nums[n / <span class="number">2</span>])  <span class="keyword">return</span> distance(i);</span><br><span class="line">        <span class="keyword">return</span> min(distance(i),distance(i - <span class="number">1</span>));</span><br><span class="line">    &#125;</span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>]]></content>
       <tags>
         <tag>算法</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>slab 分配器</title>
+    <url>/2024/06/04/slab-%E5%88%86%E9%85%8D%E5%99%A8/</url>
+    <content><![CDATA[<h2 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h2><p>本文是阅读 kernel 文档中关于 Slab 分配器的文档所写的笔记。</p>
+<p>slab分配器背后的基本思想：让常用对象的缓存保持在初始化状态供给内核使用。</p>
+<h2 id="slab-分配器的三个主要目标"><a href="#slab-分配器的三个主要目标" class="headerlink" title="slab 分配器的三个主要目标"></a>slab 分配器的三个主要目标</h2><ol>
+<li>分配小内存块有助于消除由伙伴系统引起的内部碎片。slab内部维护了两组小内存缓冲区的缓存，范围从32字节到131072（2的17次方）字节。</li>
+<li>缓存常用的对象，使系统不会浪费时间分配、初始化和销毁对象。当创建一个新的slab时，将很多对象进行打包并且进行初始化；当对象被释放，它保持其初始化状态，以便于下一次的对象分配。</li>
+<li>通过将对象与L1与L2缓存对齐，更好利用硬件缓存。这是slab的最本质的任务，如果一个对象打包进slab后还有剩余空间，slab就将其进行着色，使其与CPU L1缓存对齐。</li>
+</ol>
+<h2 id="主体"><a href="#主体" class="headerlink" title="主体"></a>主体</h2><p> slabs_full 的所有对象都在使用中。 slabs_partial 中有空闲对象，因此是分配对象的主要候选者。 slabs_free 没有分配的对象，是slab 销毁的主要候选者。</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="comment">// The slab lists for all objects.</span></span><br><span class="line"><span class="class"><span class="keyword">struct</span> <span class="title">kmem_cache_node</span> &#123;</span></span><br><span class="line">	<span class="type">spinlock_t</span> list_lock;</span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLAB</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_partial</span>;</span>	<span class="comment">/* partial list first, better asm code */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_full</span>;</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">slabs_free</span>;</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> total_slabs;	<span class="comment">/* length of all slab lists */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_slabs;	<span class="comment">/* length of free slab list only */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> free_objects;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> free_limit;</span><br><span class="line">	<span class="type">unsigned</span> <span class="type">int</span> colour_next;	<span class="comment">/* Per-node cache coloring */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">array_cache</span> *<span class="title">shared</span>;</span>	<span class="comment">/* shared per node */</span></span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">alien_cache</span> **<span class="title">alien</span>;</span>	<span class="comment">/* on other nodes */</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> next_reap;	<span class="comment">/* updated without locking */</span></span><br><span class="line">	<span class="type">int</span> free_touched;		<span class="comment">/* updated without locking */</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB</span></span><br><span class="line">	<span class="type">unsigned</span> <span class="type">long</span> nr_partial;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">partial</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">ifdef</span> CONFIG_SLUB_DEBUG</span></span><br><span class="line">	<span class="type">atomic_long_t</span> nr_slabs;</span><br><span class="line">	<span class="type">atomic_long_t</span> total_objects;</span><br><span class="line">	<span class="class"><span class="keyword">struct</span> <span class="title">list_head</span> <span class="title">full</span>;</span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"><span class="meta">#<span class="keyword">endif</span></span></span><br><span class="line"></span><br><span class="line">&#125;;</span><br></pre></td></tr></table></figure>]]></content>
+      <tags>
+        <tag>内核</tag>
       </tags>
   </entry>
   <entry>
@@ -592,87 +620,6 @@
 ]]></content>
       <tags>
         <tag>真相还原</tag>
-      </tags>
-  </entry>
-  <entry>
-    <title>函数声明</title>
-    <url>/2023/10/11/%E5%87%BD%E6%95%B0%E5%A3%B0%E6%98%8E/</url>
-    <content><![CDATA[<h3 id="正确理解函数声明"><a href="#正确理解函数声明" class="headerlink" title="正确理解函数声明"></a>正确理解函数声明</h3><p>看书的时候看到一个很抽象的语句：<br><code>(*(void(*)())0)();</code><br>想必每个C程序员看到这条语句都会觉得难绷。这个表达式实际上是在尝试调用位于地址0处的函数指针。在大多数操作系统中，访问地址0通常是非法的，因为它可能导致程序崩溃或产生未定义的行为。这种操作在一些特殊的底层编程场景中可能有用，但在通常的应用程序中应该避免使用，因为它不安全且不可移植。</p>
-<span id="more"></span>
-
-
-<p>请各位牢记一条十分简单的规则：<strong>按照使用的方式来声明。</strong></p>
-<h4 id="声明符与表达式"><a href="#声明符与表达式" class="headerlink" title="声明符与表达式"></a>声明符与表达式</h4><p>声明符（Declaration Specifier）和表达式（Expression）是编程中的两个不同概念，它们有以下异同点：</p>
-<p><strong>相同点</strong>：</p>
-<ol>
-<li><p><strong>语法元素</strong>：声明符和表达式都是编程语言的语法元素，它们用于构建和操作程序中的数据和操作。</p>
-</li>
-<li><p><strong>用途</strong>：声明符用于声明（或定义）变量、函数、类型或其他标识符，以便程序正确识别和使用这些标识符。表达式用于表示和计算值，它可以包括操作数和操作符，用于执行特定的计算操作。</p>
-</li>
-</ol>
-<p><strong>不同点</strong>：</p>
-<ol>
-<li><p><strong>含义和作用</strong>：</p>
-<ul>
-<li><strong>声明符</strong> 用于描述标识符的性质和类型，但不执行计算或操作。它告诉编译器如何分配内存和如何解释标识符的内容。</li>
-<li><strong>表达式</strong> 用于表示和计算值，执行特定的计算操作，返回一个结果。表达式可以包括常量、变量、运算符和函数调用等，用于生成新的值。</li>
-</ul>
-</li>
-<li><p><strong>例子</strong>：</p>
-<ul>
-<li>声明符示例：<code>int x;</code>（声明一个整数变量x）、<code>void myFunction();</code>（声明一个没有返回值的函数myFunction）。</li>
-<li>表达式示例：<code>x + 5</code>（计算x与5的和，返回一个值）、<code>myFunction()</code>（调用函数myFunction，返回其结果）。</li>
-</ul>
-</li>
-<li><p><strong>上下文</strong>：</p>
-<ul>
-<li><strong>声明符</strong> 通常出现在变量、函数、类型或其他标识符的声明语句中，例如在变量声明、函数原型、结构体定义等地方。</li>
-<li><strong>表达式</strong> 通常出现在赋值语句、算术运算、逻辑运算、函数调用等地方，用于执行操作和计算值。</li>
-</ul>
-</li>
-</ol>
-<p>总之，声明符用于描述标识符的性质和类型，而表达式用于表示和计算值。它们在编程中扮演不同的角色，但都是构建程序逻辑的重要组成部分。</p>
-<h4 id="声明"><a href="#声明" class="headerlink" title="声明"></a>声明</h4><p>任何的C变量的声明都由两部分组成：类型，声明符。最简单的声明符就是单个变量，比如：</p>
-<p><code>int tmp;</code></p>
-<p>这个声明的含义是：当对其求值时，tmp的类型是<code>int</code>。<br>当然也可以这样写：</p>
-<p><code>int ((tmp));</code></p>
-<p>这个声明的含义是：当对其求值时，((tmp))的类型是<code>int</code>型，因此也可以推出来tmp的类型是<code>int</code>。<br>同理的逻辑也适用于函数和指针的声明：</p>
-<p><code>double func();</code></p>
-<p>这个声明的含义是：<code>func()</code>求值的结果是<code>double</code>类型。也就是说，<code>func</code>是一个返回值为<code>double</code>类型的函数。</p>
-<p><code>int* p;</code></p>
-<p>这个声明的含义是：<code>*p</code>是一个<code>int</code>型数据。也就是说，<code>p</code>是一个指向<code>int</code>型数据的指针。</p>
-<p>将上面的声明组合一下：</p>
-<p><code>double *func2(),(*func3)();</code></p>
-<p>表示<code>*func2()</code>和<code>(*func3())</code>都是浮点类型的声明符。因为<code>()</code>优先级高于<code>*</code>，可以得出：<br><code>func2</code>是一个函数，该函数的返回值是指向<code>double</code>类型数据的指针。<br><code>func3</code>是一个函数指针，其指向的函数的返回值类型是<code>double</code>。</p>
-<h4 id="类型转换符"><a href="#类型转换符" class="headerlink" title="类型转换符"></a>类型转换符</h4><p>类型转换符是一种在编程语言中用于改变一个值的数据类型的操作符或关键字。类型转换符允许程序员显式地指定将一个数据类型转换为另一个数据类型的方式。这种操作通常称为类型转换或强制类型转换。在理解了上面的知识点后，如果得到一个声明好的、给定类型的变量，得到它的类型转换符也就不是一件难事。例如：</p>
-<p><code>float (*tmp)();</code></p>
-<p>表示<code>tmp</code>是一个指向返回值为<code>float</code>类型的函数的指针，那么：</p>
-<p><code>float (*)()</code></p>
-<p>也就表示为一个“一个指向返回值为<code>float</code>类型的函数的指针”的类型转换符。</p>
-<p>可以看下面代码再练习练习：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">myFunction</span><span class="params">(<span class="type">char</span> *str, <span class="type">int</span> num)</span> &#123;</span><br><span class="line">    <span class="comment">// 函数实现</span></span><br><span class="line">    <span class="keyword">return</span> num * <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 声明一个函数指针，并初始化为指向myFunction的指针</span></span><br><span class="line">    <span class="type">int</span> (*h)(<span class="type">char</span> *, <span class="type">int</span>);</span><br><span class="line">    <span class="comment">// 这里的myFunction的类型就是 int (*)(char *, int),为了便于理解我就全部写出来了</span></span><br><span class="line">    h = (<span class="type">int</span> (*)(<span class="type">char</span> *, <span class="type">int</span>))myFunction;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 现在可以使用h来调用函数</span></span><br><span class="line">    <span class="type">int</span> result = h(<span class="string">&quot;Hello&quot;</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, result);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-<p>注意：</p>
-<p><code>(*fp)();</code></p>
-<p>fp是一个<strong>函数指针</strong>，那么<code>*fp</code>就是该指针指向的函数，所以<code>(*fp)()</code>就是调用这个函数的方式。但是，ANSI C 标准允许程序员将上式子简写成<code>fp()</code>，这只是一种<strong>简写</strong>。</p>
-<p>看的仔细的读者就会发现，我上面代码调用函数也使用了简写。因此我上面的代码中：<code>int result = h(&quot;Hello&quot;, 1);</code>实际上是<code>int result = (*h)(&quot;Hello&quot;, 1);</code>。</p>
-<h4 id="解答"><a href="#解答" class="headerlink" title="解答"></a>解答</h4><p><code>(*(void(*)())0)();</code>被设计的目的是为了在计算机启动的时候，硬件将调用首地址为0位置的子例程。</p>
-<p>你可能会想，为什么不直接：</p>
-<p><code>(* 0)()</code></p>
-<p>可惜编译器是笨重的。因为运算符<code>*</code>必须要一个指针来进行解引用。而且这个指针还应该是一个函数指针，这样经过运算符<code>*</code>作用后的结果才能作为函数被调用。因此，上式子对<code>0</code>要进行强制类型转换为一个“指向返回值为void类型的函数的指针”。因此就有了下式：</p>
-<p><code>(*(void(*)())0)();</code>,让我解释一下这个表达式的各个部分：</p>
-<ol>
-<li><p><code>void(*)()</code>：这部分表示一个函数指针类型，它指向一个没有参数并且没有返回值的函数。这是一个函数指针类型的定义，但没有指向任何有效函数。</p>
-</li>
-<li><p><code>0</code>：这是一个空指针，它不指向任何内存地址。</p>
-</li>
-<li><p><code>(*(void(*)())0)</code>：这部分将空指针转换为一个函数指针，然后尝试通过解引用这个函数指针来调用一个函数。</p>
-</li>
-<li><p>最后的 <code>();</code> 尝试调用解引用的函数指针，但由于函数指针不指向有效函数，这会导致未定义行为，通常会导致程序崩溃或其他不可预测的结果。</p>
-</li>
-</ol>
-]]></content>
-      <tags>
-        <tag>C语言</tag>
       </tags>
   </entry>
   <entry>
@@ -786,6 +733,87 @@
 ]]></content>
       <tags>
         <tag>x86汇编</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>函数声明</title>
+    <url>/2023/10/11/%E5%87%BD%E6%95%B0%E5%A3%B0%E6%98%8E/</url>
+    <content><![CDATA[<h3 id="正确理解函数声明"><a href="#正确理解函数声明" class="headerlink" title="正确理解函数声明"></a>正确理解函数声明</h3><p>看书的时候看到一个很抽象的语句：<br><code>(*(void(*)())0)();</code><br>想必每个C程序员看到这条语句都会觉得难绷。这个表达式实际上是在尝试调用位于地址0处的函数指针。在大多数操作系统中，访问地址0通常是非法的，因为它可能导致程序崩溃或产生未定义的行为。这种操作在一些特殊的底层编程场景中可能有用，但在通常的应用程序中应该避免使用，因为它不安全且不可移植。</p>
+<span id="more"></span>
+
+
+<p>请各位牢记一条十分简单的规则：<strong>按照使用的方式来声明。</strong></p>
+<h4 id="声明符与表达式"><a href="#声明符与表达式" class="headerlink" title="声明符与表达式"></a>声明符与表达式</h4><p>声明符（Declaration Specifier）和表达式（Expression）是编程中的两个不同概念，它们有以下异同点：</p>
+<p><strong>相同点</strong>：</p>
+<ol>
+<li><p><strong>语法元素</strong>：声明符和表达式都是编程语言的语法元素，它们用于构建和操作程序中的数据和操作。</p>
+</li>
+<li><p><strong>用途</strong>：声明符用于声明（或定义）变量、函数、类型或其他标识符，以便程序正确识别和使用这些标识符。表达式用于表示和计算值，它可以包括操作数和操作符，用于执行特定的计算操作。</p>
+</li>
+</ol>
+<p><strong>不同点</strong>：</p>
+<ol>
+<li><p><strong>含义和作用</strong>：</p>
+<ul>
+<li><strong>声明符</strong> 用于描述标识符的性质和类型，但不执行计算或操作。它告诉编译器如何分配内存和如何解释标识符的内容。</li>
+<li><strong>表达式</strong> 用于表示和计算值，执行特定的计算操作，返回一个结果。表达式可以包括常量、变量、运算符和函数调用等，用于生成新的值。</li>
+</ul>
+</li>
+<li><p><strong>例子</strong>：</p>
+<ul>
+<li>声明符示例：<code>int x;</code>（声明一个整数变量x）、<code>void myFunction();</code>（声明一个没有返回值的函数myFunction）。</li>
+<li>表达式示例：<code>x + 5</code>（计算x与5的和，返回一个值）、<code>myFunction()</code>（调用函数myFunction，返回其结果）。</li>
+</ul>
+</li>
+<li><p><strong>上下文</strong>：</p>
+<ul>
+<li><strong>声明符</strong> 通常出现在变量、函数、类型或其他标识符的声明语句中，例如在变量声明、函数原型、结构体定义等地方。</li>
+<li><strong>表达式</strong> 通常出现在赋值语句、算术运算、逻辑运算、函数调用等地方，用于执行操作和计算值。</li>
+</ul>
+</li>
+</ol>
+<p>总之，声明符用于描述标识符的性质和类型，而表达式用于表示和计算值。它们在编程中扮演不同的角色，但都是构建程序逻辑的重要组成部分。</p>
+<h4 id="声明"><a href="#声明" class="headerlink" title="声明"></a>声明</h4><p>任何的C变量的声明都由两部分组成：类型，声明符。最简单的声明符就是单个变量，比如：</p>
+<p><code>int tmp;</code></p>
+<p>这个声明的含义是：当对其求值时，tmp的类型是<code>int</code>。<br>当然也可以这样写：</p>
+<p><code>int ((tmp));</code></p>
+<p>这个声明的含义是：当对其求值时，((tmp))的类型是<code>int</code>型，因此也可以推出来tmp的类型是<code>int</code>。<br>同理的逻辑也适用于函数和指针的声明：</p>
+<p><code>double func();</code></p>
+<p>这个声明的含义是：<code>func()</code>求值的结果是<code>double</code>类型。也就是说，<code>func</code>是一个返回值为<code>double</code>类型的函数。</p>
+<p><code>int* p;</code></p>
+<p>这个声明的含义是：<code>*p</code>是一个<code>int</code>型数据。也就是说，<code>p</code>是一个指向<code>int</code>型数据的指针。</p>
+<p>将上面的声明组合一下：</p>
+<p><code>double *func2(),(*func3)();</code></p>
+<p>表示<code>*func2()</code>和<code>(*func3())</code>都是浮点类型的声明符。因为<code>()</code>优先级高于<code>*</code>，可以得出：<br><code>func2</code>是一个函数，该函数的返回值是指向<code>double</code>类型数据的指针。<br><code>func3</code>是一个函数指针，其指向的函数的返回值类型是<code>double</code>。</p>
+<h4 id="类型转换符"><a href="#类型转换符" class="headerlink" title="类型转换符"></a>类型转换符</h4><p>类型转换符是一种在编程语言中用于改变一个值的数据类型的操作符或关键字。类型转换符允许程序员显式地指定将一个数据类型转换为另一个数据类型的方式。这种操作通常称为类型转换或强制类型转换。在理解了上面的知识点后，如果得到一个声明好的、给定类型的变量，得到它的类型转换符也就不是一件难事。例如：</p>
+<p><code>float (*tmp)();</code></p>
+<p>表示<code>tmp</code>是一个指向返回值为<code>float</code>类型的函数的指针，那么：</p>
+<p><code>float (*)()</code></p>
+<p>也就表示为一个“一个指向返回值为<code>float</code>类型的函数的指针”的类型转换符。</p>
+<p>可以看下面代码再练习练习：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="meta">#<span class="keyword">include</span> <span class="string">&lt;stdio.h&gt;</span></span></span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">myFunction</span><span class="params">(<span class="type">char</span> *str, <span class="type">int</span> num)</span> &#123;</span><br><span class="line">    <span class="comment">// 函数实现</span></span><br><span class="line">    <span class="keyword">return</span> num * <span class="number">2</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="type">int</span> <span class="title function_">main</span><span class="params">()</span> &#123;</span><br><span class="line">    <span class="comment">// 声明一个函数指针，并初始化为指向myFunction的指针</span></span><br><span class="line">    <span class="type">int</span> (*h)(<span class="type">char</span> *, <span class="type">int</span>);</span><br><span class="line">    <span class="comment">// 这里的myFunction的类型就是 int (*)(char *, int),为了便于理解我就全部写出来了</span></span><br><span class="line">    h = (<span class="type">int</span> (*)(<span class="type">char</span> *, <span class="type">int</span>))myFunction;</span><br><span class="line"></span><br><span class="line">    <span class="comment">// 现在可以使用h来调用函数</span></span><br><span class="line">    <span class="type">int</span> result = h(<span class="string">&quot;Hello&quot;</span>, <span class="number">1</span>);</span><br><span class="line">    <span class="built_in">printf</span>(<span class="string">&quot;%d\n&quot;</span>, result);</span><br><span class="line"></span><br><span class="line">    <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+<p>注意：</p>
+<p><code>(*fp)();</code></p>
+<p>fp是一个<strong>函数指针</strong>，那么<code>*fp</code>就是该指针指向的函数，所以<code>(*fp)()</code>就是调用这个函数的方式。但是，ANSI C 标准允许程序员将上式子简写成<code>fp()</code>，这只是一种<strong>简写</strong>。</p>
+<p>看的仔细的读者就会发现，我上面代码调用函数也使用了简写。因此我上面的代码中：<code>int result = h(&quot;Hello&quot;, 1);</code>实际上是<code>int result = (*h)(&quot;Hello&quot;, 1);</code>。</p>
+<h4 id="解答"><a href="#解答" class="headerlink" title="解答"></a>解答</h4><p><code>(*(void(*)())0)();</code>被设计的目的是为了在计算机启动的时候，硬件将调用首地址为0位置的子例程。</p>
+<p>你可能会想，为什么不直接：</p>
+<p><code>(* 0)()</code></p>
+<p>可惜编译器是笨重的。因为运算符<code>*</code>必须要一个指针来进行解引用。而且这个指针还应该是一个函数指针，这样经过运算符<code>*</code>作用后的结果才能作为函数被调用。因此，上式子对<code>0</code>要进行强制类型转换为一个“指向返回值为void类型的函数的指针”。因此就有了下式：</p>
+<p><code>(*(void(*)())0)();</code>,让我解释一下这个表达式的各个部分：</p>
+<ol>
+<li><p><code>void(*)()</code>：这部分表示一个函数指针类型，它指向一个没有参数并且没有返回值的函数。这是一个函数指针类型的定义，但没有指向任何有效函数。</p>
+</li>
+<li><p><code>0</code>：这是一个空指针，它不指向任何内存地址。</p>
+</li>
+<li><p><code>(*(void(*)())0)</code>：这部分将空指针转换为一个函数指针，然后尝试通过解引用这个函数指针来调用一个函数。</p>
+</li>
+<li><p>最后的 <code>();</code> 尝试调用解引用的函数指针，但由于函数指针不指向有效函数，这会导致未定义行为，通常会导致程序崩溃或其他不可预测的结果。</p>
+</li>
+</ol>
+]]></content>
+      <tags>
+        <tag>C语言</tag>
       </tags>
   </entry>
   <entry>
@@ -949,28 +977,6 @@
       </tags>
   </entry>
   <entry>
-    <title>搭建内核调试环境</title>
-    <url>/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/</url>
-    <content><![CDATA[<ol>
-<li>下载 linux 源码，v6.10-rc2</li>
-<li>在项目根目录下执行 <code>make menuconfig</code></li>
-</ol>
-<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>Kernel hacking  —&gt;<br>    Compile-time checks and compiler options  —&gt;<br>        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;<br>            (X) Generate DWARF Version 5 debuginfo </p>
-<pre><code>[*] Provide GDB scripts for kernel debugging 
-</code></pre>
-<p>make -j8</p>
-<p>busybox 1.36.1</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line">code scripts/kconfig/lxdialog/Makefile</span><br><span class="line"><span class="meta"># always		:= $(hostprogs-y) dochecklxdialog</span></span><br></pre></td></tr></table></figure>
-
-<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">make menuconfig</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<p>[*] Build static binary (no shared libs)  </p>
-]]></content>
-      <tags>
-        <tag>内核</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>指针和数组</title>
     <url>/2023/10/10/%E6%8C%87%E9%92%88%E5%92%8C%E6%95%B0%E7%BB%84/</url>
     <content><![CDATA[<h3 id="指针和数组"><a href="#指针和数组" class="headerlink" title="指针和数组"></a>指针和数组</h3><p>C 语言中指针和数组这两个概念密不可分，以至于如果没有理解其中一个概念，就无法彻底理解另一个概念。</p>
@@ -1001,6 +1007,28 @@
 ]]></content>
       <tags>
         <tag>C语言</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>搭建内核调试环境</title>
+    <url>/2024/06/04/%E6%90%AD%E5%BB%BA%E5%86%85%E6%A0%B8%E8%B0%83%E8%AF%95%E7%8E%AF%E5%A2%83/</url>
+    <content><![CDATA[<ol>
+<li>下载 linux 源码，v6.10-rc2</li>
+<li>在项目根目录下执行 <code>make menuconfig</code></li>
+</ol>
+<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>Kernel hacking  —&gt;<br>    Compile-time checks and compiler options  —&gt;<br>        Debug information (Generate DWARF Version 5 debuginfo)  —&gt;<br>            (X) Generate DWARF Version 5 debuginfo </p>
+<pre><code>[*] Provide GDB scripts for kernel debugging 
+</code></pre>
+<p>make -j8</p>
+<p>busybox 1.36.1</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"></span><br><span class="line">code scripts/kconfig/lxdialog/Makefile</span><br><span class="line"><span class="meta"># always		:= $(hostprogs-y) dochecklxdialog</span></span><br></pre></td></tr></table></figure>
+
+<figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">make menuconfig</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>[*] Build static binary (no shared libs)  </p>
+]]></content>
+      <tags>
+        <tag>内核</tag>
       </tags>
   </entry>
   <entry>
@@ -1078,42 +1106,6 @@
       </tags>
   </entry>
   <entry>
-    <title>条款25:针对右值引用实施std::move，针对万能引用实施std::forward</title>
-    <url>/2023/10/12/%E6%9D%A1%E6%AC%BE25/</url>
-    <content><![CDATA[<h3 id="重载？"><a href="#重载？" class="headerlink" title="重载？"></a>重载？</h3><p>在条款23的基础上，再来细说一下<code>std::move</code>和<code>std::forward</code>。看这个例子：</p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::<span class="built_in">move</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>看着好像一切安好。<span id="more"></span>注意这里的<code>n</code>是局部变量，传递给<code>e.setName()</code>，调用者假定该函数对<code>n</code>只进行读操作是没有任何问题的。但是<code>setName()</code>内部使用了<code>std::move</code>将其引用的形参无条件强转成右值，因此<code>n</code>的数值就会被移入<code>e.name</code>。运行完<code>setName()</code>后，<code>n</code>就成了一个未知数。</p>
-<p>你会说：那我为啥要把形参声明称万能引用自讨苦吃，我直接为其分别重载左值和右值两个版本不就好了。你说的对，但是对的很难受。程序运行效率降低是其次，最主要的是代码难以维护以及扩展性太差。</p>
-<p>这个例子只有一个形参，还好处理，两个重载版本就行了。那么10个参数的呢？难不成你重载 (2^{10}) 个版本？有啥想不开的非要这么折磨自己。更别说有些函数模板会有无穷多个形参（比如：<code>std::make_shared</code>）</p>
-<h3 id="万能引用！"><a href="#万能引用！" class="headerlink" title="万能引用！"></a>万能引用！</h3><p>上面的例子修改如下，这样就不需要重载也能实现对应功能了：</p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::forward&lt;T&gt;(newName); <span class="comment">// 使用 std::forward 来保持左值或右值性质</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;NewName&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
-
-<h3 id="需要注意的点"><a href="#需要注意的点" class="headerlink" title="需要注意的点"></a>需要注意的点</h3><p>假设在某个函数中，你刚开始只用了一次该对<br>象，之后就对其实施<code>std::move</code>或者<code>std::forward</code>，这没有问题，需要注意的是，随着函数不断完善，如果在该函数中不止一次地绑定到右值引用或者万能引用，就会导致上面变量<code>n</code>就成了一个未知数的错误。因此，在这种情况下，只能在最后一次使用该引用的时候对其实施<code>std::move</code>或者<code>std::forward</code>来确保其他操作时候其值依旧存在。</p>
-<h3 id="std-move-if-noexcept"><a href="#std-move-if-noexcept" class="headerlink" title="std::move_if_noexcept"></a>std::move_if_noexcept</h3><p><code>std::move_if_noexcept</code> 通常用于优化移动操作，特别是在异常安全性方面。它可以帮助在一些情况下，当移动操作不会抛出异常时，避免不必要的拷贝。</p>
-<p>这个函数的典型用例是在容器类的 <code>emplace_back</code> 和 <code>emplace</code> 成员函数中，这些函数通常要求插入元素时提供的参数（构造元素的参数）不会抛出异常。这样可以确保在插入元素时，如果构造过程抛出异常，容器的状态不会受到破坏，因为元素的构造是在容器内完成的。</p>
-<p>考虑以下示例，使用 <code>std::move_if_noexcept</code> 在 <code>emplace_back</code> 中：</p>
-<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">std::vector&lt;MyType&gt; myVector;</span><br><span class="line">myVector.<span class="built_in">emplace_back</span>(std::<span class="built_in">move_if_noexcept</span>(someValue));</span><br></pre></td></tr></table></figure>
-
-<p>在这里，<code>std::move_if_noexcept</code> 会检查 <code>someValue</code> 是否可以进行无异常移动，如果可以，它会使用移动操作，否则会进行拷贝操作。这有助于确保异常安全性，以避免在构造元素时抛出异常时，不会破坏容器的状态。</p>
-<p>要使用 <code>std::move_if_noexcept</code>，您需要确保在需要优化移动操作的情况下，并且对于元素类型的移动构造函数声明了 <code>noexcept</code> 说明符。这通常是在实现自定义类时要考虑的事情。</p>
-<p>总之，<code>std::move_if_noexcept</code> 是一种有助于提高性能并确保异常安全性的工具，但需要在适当的情况下使用它。</p>
-<h3 id="局部对象可能适用于返回值优化"><a href="#局部对象可能适用于返回值优化" class="headerlink" title="局部对象可能适用于返回值优化"></a>局部对象可能适用于返回值优化</h3><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 复制版本</span></span></span><br><span class="line"><span class="function"> </span>&#123;</span><br><span class="line">    Widget w;           <span class="comment">// 局部变量</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> w;           <span class="comment">// 将w&quot;复制&quot;入返回值</span></span><br><span class="line"> &#125;</span><br><span class="line"><span class="comment">// 将&quot;复制&quot;转换为移动来进行优化？</span></span><br><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 移动版本</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Widget w;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> std::<span class="built_in">move</span>(w);   <span class="comment">//将w移入返回值，不能这样做！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-
-<p>很不幸，这样是不正确的。因为先人就是这样规定的。开个玩笑，因为先人已经比我们领先很多年想到并且解决了这里的优化问题。也就是熟知的RVO(返回值优化)。</p>
-<p>编译器如果要在一个桉之返回的函数里忽略对局部对象的复制（或移动），需要满足两个条件：</p>
-<ol>
-<li>局部对象和返回值性别相同</li>
-<li>返回的就是局部对象本身</li>
-</ol>
-<p>我们现在往上看“复制版本”的函数，两个条件均满足，所以进行返回值优化，实质上该函数并没有复制任何东西。而移动版本的函数不满足第二个规定，返回的不是本身而是引用，并没有优化，编译器就把返回值<code>w</code>移入函数的返回值存储的位置。<code>RVO</code>的那条福音后面又接着说明,即使实施<code>RVO</code>的前提条件满足,但编译器选择不执行复制省略的时候,返回对象必须作为右值处理。这么一来,就等于标准要求:当<code>RVO</code>的前提条件允许时,要么发生复制省略,要么<code>std:: move</code>隐式地被实施于返回的局部对象上。因此，上面的例子中复制版本的函数就可能被编译器优化成移动的版本。</p>
-<p>既然如此，就不要使用<code>std::move</code>或者<code>std::forward</code>来对可能适用于优化的局部对象处理。防止排除编译器<code>RVO</code>的实施机会。</p>
-]]></content>
-      <tags>
-        <tag>c++</tag>
-      </tags>
-  </entry>
-  <entry>
     <title>条款24:区分万能引用和右值引用</title>
     <url>/2023/10/12/%E6%9D%A1%E6%AC%BE24/</url>
     <content><![CDATA[<h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>不是所有的<code>&amp;&amp;</code>都是右值引用！</p>
@@ -1152,6 +1144,42 @@
 <h4 id="多说一点"><a href="#多说一点" class="headerlink" title="多说一点"></a>多说一点</h4><p>有些人不清楚<code>template&lt;class... Args&gt;</code>中的<code>...</code>是什么，其实很简单，”…” 是用来表示可变参数模板的语法。它用于表示函数或类模板可以接受可变数量的参数。具体来说，<code>Args</code> 是一个参数包，它可以包含零个或多个模板参数。<code>Args&amp;&amp;... args</code> 表示您可以将任意数量的参数传递给 <code>emplace_back</code> 函数，每个参数都会被表示为 <code>Args</code> 类型的右值引用。这种语法通常用于实现”完美转发”。（后面会提到）</p>
 <p>而前面提到的另一种场景,auto声明，在<code>C++11</code>中不怎么普遍。而在<code>C++14</code>中，它现身的机会就更多了，因为<code>C++14</code>中的<code>lambda</code>表达式中可以声明<code>auto&amp;&amp; </code>的形参。</p>
 <h3 id="万能引用的作用"><a href="#万能引用的作用" class="headerlink" title="万能引用的作用"></a>万能引用的作用</h3><p>这种引用在模板编程中非常有用，因为它们能够保持对传递给它们的参数的左值或右值性质，并且可以实现完美转发，使它们适用于各种不同类型的参数。</p>
+]]></content>
+      <tags>
+        <tag>c++</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>条款25:针对右值引用实施std::move，针对万能引用实施std::forward</title>
+    <url>/2023/10/12/%E6%9D%A1%E6%AC%BE25/</url>
+    <content><![CDATA[<h3 id="重载？"><a href="#重载？" class="headerlink" title="重载？"></a>重载？</h3><p>在条款23的基础上，再来细说一下<code>std::move</code>和<code>std::forward</code>。看这个例子：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::<span class="built_in">move</span>(newName);</span><br><span class="line">    &#125;</span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span></span>;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>看着好像一切安好。<span id="more"></span>注意这里的<code>n</code>是局部变量，传递给<code>e.setName()</code>，调用者假定该函数对<code>n</code>只进行读操作是没有任何问题的。但是<code>setName()</code>内部使用了<code>std::move</code>将其引用的形参无条件强转成右值，因此<code>n</code>的数值就会被移入<code>e.name</code>。运行完<code>setName()</code>后，<code>n</code>就成了一个未知数。</p>
+<p>你会说：那我为啥要把形参声明称万能引用自讨苦吃，我直接为其分别重载左值和右值两个版本不就好了。你说的对，但是对的很难受。程序运行效率降低是其次，最主要的是代码难以维护以及扩展性太差。</p>
+<p>这个例子只有一个形参，还好处理，两个重载版本就行了。那么10个参数的呢？难不成你重载 (2^{10}) 个版本？有啥想不开的非要这么折磨自己。更别说有些函数模板会有无穷多个形参（比如：<code>std::make_shared</code>）</p>
+<h3 id="万能引用！"><a href="#万能引用！" class="headerlink" title="万能引用！"></a>万能引用！</h3><p>上面的例子修改如下，这样就不需要重载也能实现对应功能了：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="keyword">class</span> <span class="title class_">Data</span> &#123;&#125;;</span><br><span class="line"><span class="keyword">class</span> <span class="title class_">Entity</span> &#123;</span><br><span class="line">   <span class="keyword">public</span>:</span><br><span class="line">    <span class="keyword">template</span> &lt;<span class="keyword">typename</span> T&gt;</span><br><span class="line">    <span class="function"><span class="type">void</span> <span class="title">setName</span><span class="params">(T&amp;&amp; newName)</span> </span>&#123;</span><br><span class="line">        name = std::forward&lt;T&gt;(newName); <span class="comment">// 使用 std::forward 来保持左值或右值性质</span></span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">   <span class="keyword">private</span>:</span><br><span class="line">    std::string name;</span><br><span class="line">    std::shared_ptr&lt;Data&gt; ptr;</span><br><span class="line">&#125;;</span><br><span class="line"><span class="function">std::string <span class="title">getEntityName</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="keyword">return</span> <span class="string">&quot;NewName&quot;</span>;</span><br><span class="line">&#125;</span><br><span class="line"><span class="function"><span class="type">int</span> <span class="title">main</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    Entity e;</span><br><span class="line">    <span class="keyword">auto</span> n = <span class="built_in">getEntityName</span>();</span><br><span class="line">    e.<span class="built_in">setName</span>(n);</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<h3 id="需要注意的点"><a href="#需要注意的点" class="headerlink" title="需要注意的点"></a>需要注意的点</h3><p>假设在某个函数中，你刚开始只用了一次该对<br>象，之后就对其实施<code>std::move</code>或者<code>std::forward</code>，这没有问题，需要注意的是，随着函数不断完善，如果在该函数中不止一次地绑定到右值引用或者万能引用，就会导致上面变量<code>n</code>就成了一个未知数的错误。因此，在这种情况下，只能在最后一次使用该引用的时候对其实施<code>std::move</code>或者<code>std::forward</code>来确保其他操作时候其值依旧存在。</p>
+<h3 id="std-move-if-noexcept"><a href="#std-move-if-noexcept" class="headerlink" title="std::move_if_noexcept"></a>std::move_if_noexcept</h3><p><code>std::move_if_noexcept</code> 通常用于优化移动操作，特别是在异常安全性方面。它可以帮助在一些情况下，当移动操作不会抛出异常时，避免不必要的拷贝。</p>
+<p>这个函数的典型用例是在容器类的 <code>emplace_back</code> 和 <code>emplace</code> 成员函数中，这些函数通常要求插入元素时提供的参数（构造元素的参数）不会抛出异常。这样可以确保在插入元素时，如果构造过程抛出异常，容器的状态不会受到破坏，因为元素的构造是在容器内完成的。</p>
+<p>考虑以下示例，使用 <code>std::move_if_noexcept</code> 在 <code>emplace_back</code> 中：</p>
+<figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line">std::vector&lt;MyType&gt; myVector;</span><br><span class="line">myVector.<span class="built_in">emplace_back</span>(std::<span class="built_in">move_if_noexcept</span>(someValue));</span><br></pre></td></tr></table></figure>
+
+<p>在这里，<code>std::move_if_noexcept</code> 会检查 <code>someValue</code> 是否可以进行无异常移动，如果可以，它会使用移动操作，否则会进行拷贝操作。这有助于确保异常安全性，以避免在构造元素时抛出异常时，不会破坏容器的状态。</p>
+<p>要使用 <code>std::move_if_noexcept</code>，您需要确保在需要优化移动操作的情况下，并且对于元素类型的移动构造函数声明了 <code>noexcept</code> 说明符。这通常是在实现自定义类时要考虑的事情。</p>
+<p>总之，<code>std::move_if_noexcept</code> 是一种有助于提高性能并确保异常安全性的工具，但需要在适当的情况下使用它。</p>
+<h3 id="局部对象可能适用于返回值优化"><a href="#局部对象可能适用于返回值优化" class="headerlink" title="局部对象可能适用于返回值优化"></a>局部对象可能适用于返回值优化</h3><figure class="highlight cpp"><table><tr><td class="code"><pre><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 复制版本</span></span></span><br><span class="line"><span class="function"> </span>&#123;</span><br><span class="line">    Widget w;           <span class="comment">// 局部变量</span></span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> w;           <span class="comment">// 将w&quot;复制&quot;入返回值</span></span><br><span class="line"> &#125;</span><br><span class="line"><span class="comment">// 将&quot;复制&quot;转换为移动来进行优化？</span></span><br><span class="line"><span class="function">Widget <span class="title">makeWidget</span> <span class="params">()</span>    <span class="comment">// 移动版本</span></span></span><br><span class="line"><span class="function"></span>&#123;</span><br><span class="line">    Widget w;</span><br><span class="line">    <span class="comment">// ...</span></span><br><span class="line">    <span class="keyword">return</span> std::<span class="built_in">move</span>(w);   <span class="comment">//将w移入返回值，不能这样做！</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>很不幸，这样是不正确的。因为先人就是这样规定的。开个玩笑，因为先人已经比我们领先很多年想到并且解决了这里的优化问题。也就是熟知的RVO(返回值优化)。</p>
+<p>编译器如果要在一个桉之返回的函数里忽略对局部对象的复制（或移动），需要满足两个条件：</p>
+<ol>
+<li>局部对象和返回值性别相同</li>
+<li>返回的就是局部对象本身</li>
+</ol>
+<p>我们现在往上看“复制版本”的函数，两个条件均满足，所以进行返回值优化，实质上该函数并没有复制任何东西。而移动版本的函数不满足第二个规定，返回的不是本身而是引用，并没有优化，编译器就把返回值<code>w</code>移入函数的返回值存储的位置。<code>RVO</code>的那条福音后面又接着说明,即使实施<code>RVO</code>的前提条件满足,但编译器选择不执行复制省略的时候,返回对象必须作为右值处理。这么一来,就等于标准要求:当<code>RVO</code>的前提条件允许时,要么发生复制省略,要么<code>std:: move</code>隐式地被实施于返回的局部对象上。因此，上面的例子中复制版本的函数就可能被编译器优化成移动的版本。</p>
+<p>既然如此，就不要使用<code>std::move</code>或者<code>std::forward</code>来对可能适用于优化的局部对象处理。防止排除编译器<code>RVO</code>的实施机会。</p>
 ]]></content>
       <tags>
         <tag>c++</tag>
@@ -1212,6 +1240,34 @@
 ]]></content>
       <tags>
         <tag>真相还原</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>运算符优先级</title>
+    <url>/2023/10/11/%E8%BF%90%E7%AE%97%E7%AC%A6%E4%BC%98%E5%85%88%E7%BA%A7/</url>
+    <content><![CDATA[<h3 id="运算符优先级的问题"><a href="#运算符优先级的问题" class="headerlink" title="运算符优先级的问题"></a>运算符优先级的问题</h3><p>假如有下面的代码。<span id="more"></span>你想在特定条件下让 <code>high</code>变量的二进制形式左移四位然后加上&#96;low&#96;&#96;:</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; tmp)&#123;</span><br><span class="line">    num1 = high&lt;&lt;<span class="number">4</span> + low;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>或许你会为了代码可读性，将其更改成下面的格式：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; tmp != <span class="number">0</span>) &#123;</span><br><span class="line">    num1 = high&lt;&lt;<span class="number">4</span> + low;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>很不幸的是，这两个 <code>if</code>语句不能画上等号,因为你没有考虑到运算符优先级的问题，下面的语句实际上是：</p>
+<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; (tmp != <span class="number">0</span>)) &#123;</span><br><span class="line">    num1 = high&lt;&lt;(<span class="number">4</span> + low);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<h3 id="运算符优先级规则"><a href="#运算符优先级规则" class="headerlink" title="运算符优先级规则"></a>运算符优先级规则</h3><p>是不是与你预想的差之千里，为了更好的使用 C 语言，每个 C coder 都应该牢记下面的几点:</p>
+<ul>
+<li>优先级最高的不是真正意义上的运算符。eg：数组下表、函数调用操作符、各结构成员选择操作符。它们都是自左向右结合的，这也就是为什么 <code>a.b.c</code>的含义是<code>(a.b).c</code>而不是 <code>a.(b.c)</code>。</li>
+<li>单目运算符（概念不清楚就搜一下）的优先级仅次于前述运算符（<code>++</code>运算符 <code>--</code>运算符）。<br>上一条也说了：函数调用操作符是优先级最高的。假如<code>p</code>是一个函数指针，我想通过这个指针来调用对应的函数，那么<code>*p()</code>显而易见错了，因为它会被编译器理解成<code>*(p())</code>，而我想要的效果是 <code>(*p)()</code>。<br>再举个关于前述运算符的例子。<code>*p++</code>，它会被编译器理解成<code>*(p++)</code>，而希望的效果是<code>(*p)++</code>。</li>
+<li>比单目运算符优先级低的就是双目运算符了。双目运算符中：算术运算符&gt;移位运算符&gt;关系运算符&gt;逻辑运算符&gt;赋值运算符&gt;条件运算符（三目运算符）。<br>这一条中最重要的几个点就是：</li>
+</ul>
+<ol>
+<li>任何一个逻辑运算符的优先级都要低于任何一个关系运算符。</li>
+<li>移位运算符的优先级比算术运算符低，但是高于关系运算符。</li>
+<li>6 个关系运算符的优先级不同。其中<code>==</code> 和 <code>!=</code> 优先级低于其他关系运算符的优先级。</li>
+<li>逻辑运算符中。按位运算符优先级高于顺序运算符。每个“与”运算符优先级高于对应的“或”运算符。异或运算符介于按位与运算符和按位或运算符之间。</li>
+<li>所有的赋值运算符优先级都是一样的（右 -&gt; 左）。eg：<code>a = b = 0;</code> 就是将 <code>a,b</code>赋值为 0。</li>
+<li>逗号运算符的优先级最低。<br>例子是举不完，记住这几条结论，在敲代码的时候多留意运算符优先级的问题，用的多了自然就熟练了。<br>也有个偷巧的方法：疯狂加括号，你想让谁先运行就给谁加括号，但是这样不好，会让代码看起来臃肿，不推荐。</li>
+</ol>
+]]></content>
+      <tags>
+        <tag>C语言</tag>
       </tags>
   </entry>
   <entry>
@@ -1306,33 +1362,5 @@
 </ol>
 <p>通过这些测试，你可以确认防火墙规则是否正确应用，并确保只允许指定的服务。</p>
 ]]></content>
-  </entry>
-  <entry>
-    <title>运算符优先级</title>
-    <url>/2023/10/11/%E8%BF%90%E7%AE%97%E7%AC%A6%E4%BC%98%E5%85%88%E7%BA%A7/</url>
-    <content><![CDATA[<h3 id="运算符优先级的问题"><a href="#运算符优先级的问题" class="headerlink" title="运算符优先级的问题"></a>运算符优先级的问题</h3><p>假如有下面的代码。<span id="more"></span>你想在特定条件下让 <code>high</code>变量的二进制形式左移四位然后加上&#96;low&#96;&#96;:</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; tmp)&#123;</span><br><span class="line">    num1 = high&lt;&lt;<span class="number">4</span> + low;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>或许你会为了代码可读性，将其更改成下面的格式：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; tmp != <span class="number">0</span>) &#123;</span><br><span class="line">    num1 = high&lt;&lt;<span class="number">4</span> + low;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<p>很不幸的是，这两个 <code>if</code>语句不能画上等号,因为你没有考虑到运算符优先级的问题，下面的语句实际上是：</p>
-<figure class="highlight c"><table><tr><td class="code"><pre><span class="line"><span class="keyword">if</span>(flag &amp; (tmp != <span class="number">0</span>)) &#123;</span><br><span class="line">    num1 = high&lt;&lt;(<span class="number">4</span> + low);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
-<h3 id="运算符优先级规则"><a href="#运算符优先级规则" class="headerlink" title="运算符优先级规则"></a>运算符优先级规则</h3><p>是不是与你预想的差之千里，为了更好的使用 C 语言，每个 C coder 都应该牢记下面的几点:</p>
-<ul>
-<li>优先级最高的不是真正意义上的运算符。eg：数组下表、函数调用操作符、各结构成员选择操作符。它们都是自左向右结合的，这也就是为什么 <code>a.b.c</code>的含义是<code>(a.b).c</code>而不是 <code>a.(b.c)</code>。</li>
-<li>单目运算符（概念不清楚就搜一下）的优先级仅次于前述运算符（<code>++</code>运算符 <code>--</code>运算符）。<br>上一条也说了：函数调用操作符是优先级最高的。假如<code>p</code>是一个函数指针，我想通过这个指针来调用对应的函数，那么<code>*p()</code>显而易见错了，因为它会被编译器理解成<code>*(p())</code>，而我想要的效果是 <code>(*p)()</code>。<br>再举个关于前述运算符的例子。<code>*p++</code>，它会被编译器理解成<code>*(p++)</code>，而希望的效果是<code>(*p)++</code>。</li>
-<li>比单目运算符优先级低的就是双目运算符了。双目运算符中：算术运算符&gt;移位运算符&gt;关系运算符&gt;逻辑运算符&gt;赋值运算符&gt;条件运算符（三目运算符）。<br>这一条中最重要的几个点就是：</li>
-</ul>
-<ol>
-<li>任何一个逻辑运算符的优先级都要低于任何一个关系运算符。</li>
-<li>移位运算符的优先级比算术运算符低，但是高于关系运算符。</li>
-<li>6 个关系运算符的优先级不同。其中<code>==</code> 和 <code>!=</code> 优先级低于其他关系运算符的优先级。</li>
-<li>逻辑运算符中。按位运算符优先级高于顺序运算符。每个“与”运算符优先级高于对应的“或”运算符。异或运算符介于按位与运算符和按位或运算符之间。</li>
-<li>所有的赋值运算符优先级都是一样的（右 -&gt; 左）。eg：<code>a = b = 0;</code> 就是将 <code>a,b</code>赋值为 0。</li>
-<li>逗号运算符的优先级最低。<br>例子是举不完，记住这几条结论，在敲代码的时候多留意运算符优先级的问题，用的多了自然就熟练了。<br>也有个偷巧的方法：疯狂加括号，你想让谁先运行就给谁加括号，但是这样不好，会让代码看起来臃肿，不推荐。</li>
-</ol>
-]]></content>
-      <tags>
-        <tag>C语言</tag>
-      </tags>
   </entry>
 </search>
